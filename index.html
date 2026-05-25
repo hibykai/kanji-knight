@@ -137,17 +137,38 @@
     text-transform: uppercase; margin-bottom: 8px;
   }
 
-  .hira-toggle {
+  .hira-toggle, .jlpt-toggle {
     display: inline-flex; background: #243057; border-radius: 999px;
-    padding: 4px; margin-bottom: 28px;
+    padding: 4px; margin-bottom: 22px;
   }
-  .hira-toggle button {
+  .hira-toggle button, .jlpt-toggle button {
     padding: 10px 26px; background: transparent; border: none;
     color: #c8d0e0; font-size: 14px; font-weight: 700;
     border-radius: 999px; cursor: pointer; font-family: inherit;
     letter-spacing: 0.5px;
   }
-  .hira-toggle button.active { background: #ffd866; color: #0f1422; }
+  .jlpt-toggle button { padding: 10px 18px; min-width: 52px; }
+  .hira-toggle button.active, .jlpt-toggle button.active {
+    background: #ffd866; color: #0f1422;
+  }
+
+  /* Timer slider */
+  .slider-row {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 28px; min-width: 320px;
+  }
+  #timer-slider {
+    flex: 1; height: 6px;
+    accent-color: #ffd866;
+    cursor: pointer;
+  }
+  .slider-value {
+    background: #243057; color: #ffd866;
+    padding: 6px 14px; border-radius: 999px;
+    font-size: 14px; font-weight: 700;
+    min-width: 56px; text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
 
   #start-btn, #restart-btn {
     padding: 14px 40px; background: #ffd866; color: #0f1422;
@@ -255,6 +276,19 @@
       <button data-mode="hiragana" class="active">Hiragana</button>
       <button data-mode="romaji">Romaji</button>
     </div>
+    <div class="label">JLPT difficulty (cumulative)</div>
+    <div class="jlpt-toggle">
+      <button data-jlpt="5" class="active">N5</button>
+      <button data-jlpt="4">N4</button>
+      <button data-jlpt="3">N3</button>
+      <button data-jlpt="2">N2</button>
+      <button data-jlpt="1">N1</button>
+    </div>
+    <div class="label">T-Rex reaches knight in</div>
+    <div class="slider-row">
+      <input type="range" id="timer-slider" min="5" max="120" step="5" value="30">
+      <div class="slider-value"><span id="timer-value">30</span>s</div>
+    </div>
     <button id="start-btn">Start Game</button>
   </div>
 
@@ -346,7 +380,6 @@ function toRomaji(s) {
 const KNIGHT_X = 12;          // % from left
 const TREX_START_X = 88;      // % from left
 const TRAVEL = TREX_START_X - KNIGHT_X;
-const BASE_SPEED = TRAVEL / 30; // %/s -> 30 sec at base
 const FAST_MULT = 1.5;
 const STUDY_MS = 5000;
 const CORRECT_PAUSE_MS = 600;
@@ -355,6 +388,8 @@ const state = {
   phase: 'idle',           // idle | study | select | correct | gameover
   score: 0,
   displayMode: 'hiragana', // 'hiragana' | 'romaji'
+  travelSeconds: 30,       // seconds for T-Rex to reach knight at base speed
+  jlptLevel: 5,            // 5 = easiest only; 1 = include everything (cumulative)
   currentEntry: null,
   options: [],             // array of 3 hiragana strings
   correctIdx: 0,
@@ -366,6 +401,17 @@ const state = {
   correctTimer: null,
   studyStart: 0,
 };
+
+// Cumulative JLPT pool: include selected level and all easier ones.
+// Because higher N number = easier kanji, e.j >= state.jlptLevel means
+// "this kanji is at the selected difficulty or easier".
+function activePool() {
+  return KANJI_DATA.filter(e => e.j >= state.jlptLevel);
+}
+
+function baseSpeed() {
+  return TRAVEL / state.travelSeconds;
+}
 
 /* ============================================================
    DISTRACTOR PICKER + UTILITIES
@@ -380,7 +426,7 @@ function shuffle(arr) {
   return a;
 }
 function pickDistractors(correctH) {
-  const others = KANJI_DATA.filter(e => e.h !== correctH);
+  const others = activePool().filter(e => e.h !== correctH);
   if (others.length < 2) return ['?', '??'];
   const scored = others.map(e => {
     let s = 0;
@@ -413,11 +459,12 @@ function display(h) {
    PHASE TRANSITIONS
    ============================================================ */
 function nextLevel() {
-  if (KANJI_DATA.length < 3) {
-    console.error('Need at least 3 kanji entries to play');
+  const pool = activePool();
+  if (pool.length < 3) {
+    console.error('Active pool too small for selected JLPT level: ' + pool.length + ' entries');
     return;
   }
-  state.currentEntry = pickRandom(KANJI_DATA);
+  state.currentEntry = pickRandom(pool);
   const dist = pickDistractors(state.currentEntry.h);
   const all = shuffle([state.currentEntry.h, dist[0], dist[1]]);
   state.options = all;
@@ -458,7 +505,7 @@ function startSelectPhase() {
     b.dataset.h = state.options[i];
   });
   document.getElementById('options-row').classList.remove('hidden');
-  state.speed = BASE_SPEED;
+  state.speed = baseSpeed();
 }
 
 function onCardClick(idx) {
@@ -480,7 +527,7 @@ function onCardClick(idx) {
   } else {
     btns[idx].classList.add('wrong');
     btns[idx].disabled = true;
-    state.speed = BASE_SPEED * FAST_MULT;
+    state.speed = baseSpeed() * FAST_MULT;
   }
 }
 
@@ -567,6 +614,21 @@ document.querySelectorAll('.hira-toggle button').forEach(btn => {
   });
 });
 
+document.querySelectorAll('.jlpt-toggle button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.jlptLevel = parseInt(btn.dataset.jlpt, 10);
+    document.querySelectorAll('.jlpt-toggle button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+const timerSlider = document.getElementById('timer-slider');
+const timerValue = document.getElementById('timer-value');
+timerSlider.addEventListener('input', () => {
+  state.travelSeconds = parseInt(timerSlider.value, 10);
+  timerValue.textContent = state.travelSeconds;
+});
+
 requestAnimationFrame(tick);
 </script>
 
@@ -580,8 +642,17 @@ requestAnimationFrame(tick);
    correct/distractor logic unambiguous.
    ============================================================ */
 
-// Chunk 1: Grade 1 Jōyō (numbers, position, basic nature, body, family)
-KANJI_DATA.push(
+// Each chunk is tagged with a JLPT level via pushChunk(level, ...entries).
+// Cumulative semantics: selecting N5 shows only j=5; N1 shows everything.
+// The runtime dedupe keeps the FIRST occurrence of each kanji, so kanji
+// appearing in multiple chunks get tagged with their EASIEST level —
+// which is exactly what cumulative filtering needs.
+function pushChunk(level, ...entries) {
+  for (const e of entries) { e.j = level; KANJI_DATA.push(e); }
+}
+
+// Chunk 1: Grade 1 Jōyō (numbers, position, basic nature, body, family) → N5
+pushChunk(5,
   {k:"一",h:"いち"},{k:"二",h:"に"},{k:"三",h:"さん"},{k:"四",h:"よん"},
   {k:"五",h:"ご"},{k:"六",h:"ろく"},{k:"七",h:"なな"},{k:"八",h:"はち"},
   {k:"九",h:"きゅう"},{k:"十",h:"じゅう"},{k:"百",h:"ひゃく"},{k:"千",h:"せん"},
@@ -605,8 +676,8 @@ KANJI_DATA.push(
   {k:"青",h:"あお"},{k:"白",h:"しろ"},{k:"正",h:"ただ"},{k:"夕",h:"ゆう"}
 );
 
-// Chunk 2: Grade 2 Jōyō — time, weather, places, more body, more verbs
-KANJI_DATA.push(
+// Chunk 2: Grade 2 Jōyō — time, weather, places, more body, more verbs → N4
+pushChunk(4,
   {k:"今",h:"いま"},{k:"古",h:"ふる"},{k:"新",h:"あたら"},{k:"後",h:"あと"},
   {k:"前",h:"まえ"},{k:"朝",h:"あさ"},{k:"昼",h:"ひる"},{k:"夜",h:"よる"},
   {k:"春",h:"はる"},{k:"夏",h:"なつ"},{k:"秋",h:"あき"},{k:"冬",h:"ふゆ"},
@@ -646,8 +717,8 @@ KANJI_DATA.push(
   {k:"丘",h:"おか"},{k:"島",h:"しま"}
 );
 
-// Chunk 3: Grade 3 Jōyō (~200) — society, school, more abstract concepts
-KANJI_DATA.push(
+// Chunk 3: Grade 3 Jōyō (~200) — society, school, more abstract concepts → N3
+pushChunk(3,
   {k:"駅",h:"えき"},{k:"院",h:"いん"},{k:"宮",h:"みや"},{k:"宿",h:"やど"},
   {k:"局",h:"きょく"},{k:"庫",h:"こ"},{k:"庭",h:"にわ"},{k:"屋",h:"や"},
   {k:"県",h:"けん"},{k:"州",h:"しゅう"},{k:"州",h:"す"},{k:"区",h:"く"},
@@ -687,8 +758,8 @@ KANJI_DATA.push(
   {k:"植",h:"う"},{k:"礼",h:"らい"},{k:"祭",h:"さい"}
 );
 
-// Chunk 4: Grade 4 Jōyō (~200) — abstract, social, government, geography
-KANJI_DATA.push(
+// Chunk 4: Grade 4 Jōyō (~200) — abstract, social, government, geography → N3
+pushChunk(3,
   {k:"愛",h:"あい"},{k:"案",h:"あん"},{k:"以",h:"い"},{k:"位",h:"くらい"},
   {k:"囲",h:"かこ"},{k:"胃",h:"い"},{k:"印",h:"しるし"},{k:"英",h:"えい"},
   {k:"栄",h:"さか"},{k:"塩",h:"えん"},{k:"億",h:"おく"},{k:"加",h:"くわ"},
@@ -741,8 +812,8 @@ KANJI_DATA.push(
   {k:"録",h:"ろく"}
 );
 
-// Chunk 5: Grade 5 Jōyō (~185)
-KANJI_DATA.push(
+// Chunk 5: Grade 5 Jōyō (~185) → N2
+pushChunk(2,
   {k:"圧",h:"あつ"},{k:"移",h:"うつ"},{k:"因",h:"いん"},{k:"永",h:"なが"},
   {k:"営",h:"いとな"},{k:"衛",h:"えい"},{k:"易",h:"やさ"},{k:"益",h:"えき"},
   {k:"液",h:"えき"},{k:"演",h:"えん"},{k:"応",h:"おう"},{k:"往",h:"おう"},
@@ -792,8 +863,8 @@ KANJI_DATA.push(
   {k:"領",h:"りょう"},{k:"歴",h:"れき"}
 );
 
-// Chunk 6: Grade 6 Jōyō (~181)
-KANJI_DATA.push(
+// Chunk 6: Grade 6 Jōyō (~181) → N2
+pushChunk(2,
   {k:"異",h:"こと"},{k:"遺",h:"のこ"},{k:"域",h:"いき"},{k:"宇",h:"う"},
   {k:"映",h:"うつ"},{k:"延",h:"の"},{k:"沿",h:"そ"},{k:"我",h:"われ"},
   {k:"灰",h:"はい"},{k:"拡",h:"ひろ"},{k:"革",h:"かわ"},{k:"閣",h:"かく"},
@@ -842,8 +913,8 @@ KANJI_DATA.push(
   {k:"朗",h:"ほが"},{k:"論",h:"ろん"}
 );
 
-// Chunk 7: Secondary-school Jōyō, batch A (~250) — common compound chars
-KANJI_DATA.push(
+// Chunk 7: Secondary-school Jōyō, batch A (~250) — common compound chars → N1
+pushChunk(1,
   {k:"握",h:"にぎ"},{k:"扱",h:"あつか"},{k:"依",h:"い"},{k:"威",h:"おど"},
   {k:"為",h:"ため"},{k:"維",h:"い"},{k:"緯",h:"いき"},{k:"違",h:"ちが"},
   {k:"井",h:"い"},{k:"芋",h:"いも"},{k:"姻",h:"いん"},{k:"陰",h:"かげ"},
@@ -907,8 +978,8 @@ KANJI_DATA.push(
   {k:"撮",h:"と"},{k:"擦",h:"す"},{k:"傘",h:"かさ"}
 );
 
-// Chunk 8: Secondary-school Jōyō, batch B (~250)
-KANJI_DATA.push(
+// Chunk 8: Secondary-school Jōyō, batch B (~250) → N1
+pushChunk(1,
   {k:"惨",h:"みじ"},{k:"桟",h:"さん"},{k:"暫",h:"ざん"},{k:"司",h:"し"},
   {k:"伺",h:"うかが"},{k:"刺",h:"さ"},{k:"祉",h:"し"},{k:"肢",h:"し"},
   {k:"施",h:"ほどこ"},{k:"脂",h:"あぶら"},{k:"紫",h:"むらさき"},{k:"嗣",h:"し"},
@@ -975,8 +1046,8 @@ KANJI_DATA.push(
   {k:"漬",h:"つ"},{k:"坪",h:"つぼ"},{k:"釣",h:"つり"}
 );
 
-// Chunk 9: Secondary-school Jōyō, batch C (~250)
-KANJI_DATA.push(
+// Chunk 9: Secondary-school Jōyō, batch C (~250) → N1
+pushChunk(1,
   {k:"亭",h:"てい"},{k:"偵",h:"てい"},{k:"貞",h:"てい"},{k:"逓",h:"てい"},
   {k:"邸",h:"てい"},{k:"締",h:"し"},{k:"艇",h:"てい"},{k:"泥",h:"どろ"},
   {k:"摘",h:"つ"},{k:"滴",h:"しずく"},{k:"哲",h:"てつ"},{k:"徹",h:"てつ"},
@@ -1039,8 +1110,8 @@ KANJI_DATA.push(
   {k:"網",h:"あみ"},{k:"黙",h:"だま"},{k:"匁",h:"もんめ"},{k:"紋",h:"もん"}
 );
 
-// Chunk 10: Secondary-school Jōyō, batch D (~250)
-KANJI_DATA.push(
+// Chunk 10: Secondary-school Jōyō, batch D (~250) → N1
+pushChunk(1,
   {k:"也",h:"や"},{k:"冶",h:"や"},{k:"夜",h:"よ"},{k:"野",h:"や"},
   {k:"弥",h:"や"},{k:"厄",h:"やく"},{k:"躍",h:"おど"},{k:"闇",h:"やみ"},
   {k:"喩",h:"ゆ"},{k:"愉",h:"ゆ"},{k:"癒",h:"い"},{k:"諭",h:"さと"},
@@ -1101,8 +1172,8 @@ KANJI_DATA.push(
   {k:"誰",h:"たれ"},{k:"旦",h:"たん"},{k:"綻",h:"ほころ"},{k:"緻",h:"ち"}
 );
 
-// Chunk 11: Secondary-school Jōyō, batch E (final ~150)
-KANJI_DATA.push(
+// Chunk 11: Secondary-school Jōyō, batch E (final ~150) → N1
+pushChunk(1,
   {k:"酎",h:"ちゅう"},{k:"貼",h:"は"},{k:"嘲",h:"あざけ"},{k:"捗",h:"ちょく"},
   {k:"椎",h:"つい"},{k:"爪",h:"つめ"},{k:"鶴",h:"つる"},{k:"諦",h:"あきら"},
   {k:"溺",h:"おぼ"},{k:"填",h:"てん"},{k:"貼",h:"てん"},{k:"妬",h:"ねた"},
