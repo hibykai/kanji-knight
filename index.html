@@ -284,6 +284,11 @@
       <button data-jlpt="2">N2</button>
       <button data-jlpt="1">N1</button>
     </div>
+    <div class="label">Study time per kanji</div>
+    <div class="slider-row">
+      <input type="range" id="study-slider" min="1" max="15" step="1" value="5">
+      <div class="slider-value"><span id="study-value">5</span>s</div>
+    </div>
     <div class="label">T-Rex reaches knight in</div>
     <div class="slider-row">
       <input type="range" id="timer-slider" min="5" max="120" step="5" value="30">
@@ -381,7 +386,6 @@ const KNIGHT_X = 12;          // % from left
 const TREX_START_X = 88;      // % from left
 const TRAVEL = TREX_START_X - KNIGHT_X;
 const FAST_MULT = 1.5;
-const STUDY_MS = 5000;
 const CORRECT_PAUSE_MS = 600;
 
 const state = {
@@ -389,6 +393,7 @@ const state = {
   score: 0,
   displayMode: 'hiragana', // 'hiragana' | 'romaji'
   travelSeconds: 30,       // seconds for T-Rex to reach knight at base speed
+  studySeconds: 5,         // seconds to study the kanji before options appear
   jlptLevel: 5,            // 5 = easiest only; 1 = include everything (cumulative)
   currentEntry: null,
   options: [],             // array of 3 hiragana strings
@@ -482,15 +487,16 @@ function startStudyPhase() {
   document.getElementById('kanji-card').classList.remove('hidden');
   document.getElementById('options-row').classList.add('hidden');
   state.studyStart = performance.now();
-  document.getElementById('study-timer').textContent = '5';
+  const studyMs = state.studySeconds * 1000;
+  document.getElementById('study-timer').textContent = String(state.studySeconds);
   if (state.studyCountdown) clearInterval(state.studyCountdown);
   state.studyCountdown = setInterval(() => {
     const elapsed = performance.now() - state.studyStart;
-    const remaining = Math.max(0, Math.ceil((STUDY_MS - elapsed) / 1000));
+    const remaining = Math.max(0, Math.ceil((studyMs - elapsed) / 1000));
     document.getElementById('study-timer').textContent = String(remaining);
   }, 100);
   if (state.studyTimer) clearTimeout(state.studyTimer);
-  state.studyTimer = setTimeout(startSelectPhase, STUDY_MS);
+  state.studyTimer = setTimeout(startSelectPhase, studyMs);
 }
 
 function startSelectPhase() {
@@ -627,6 +633,13 @@ const timerValue = document.getElementById('timer-value');
 timerSlider.addEventListener('input', () => {
   state.travelSeconds = parseInt(timerSlider.value, 10);
   timerValue.textContent = state.travelSeconds;
+});
+
+const studySlider = document.getElementById('study-slider');
+const studyValue = document.getElementById('study-value');
+studySlider.addEventListener('input', () => {
+  state.studySeconds = parseInt(studySlider.value, 10);
+  studyValue.textContent = state.studySeconds;
 });
 
 requestAnimationFrame(tick);

@@ -14,9 +14,10 @@ Live at **https://kanji-knight.vercel.app/** (or your own Vercel domain), or ope
 2. On the start screen, configure:
    - **Display readings as:** Hiragana or Romaji.
    - **JLPT difficulty (cumulative):** N5 (easiest, ~80 kanji) through N1 (all ~2000). Selecting N3 includes everything from N5–N3, so higher levels are supersets of lower ones.
+   - **Study time per kanji:** drag the slider, 1–15 seconds (default 5). How long the kanji card is shown before the answer options appear.
    - **T-Rex reaches knight in:** drag the slider, 5–120 seconds (default 30). Shorter = harder.
 3. Each round:
-   - You get **5 seconds** to study a kanji.
+   - You get your configured **study time** (default 5 seconds) to study a kanji.
    - Then 3 cards appear with possible readings — only one is correct.
    - There's no time limit on your choice, but the T-Rex is walking toward the knight.
 4. **Wrong answer:** a red ✕ appears on the card you picked, and the T-Rex speeds up to 1.5×.
