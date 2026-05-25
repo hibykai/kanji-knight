@@ -4,9 +4,13 @@ A single-file browser game that drills the most-common Jōyō kanji. A knight st
 
 ![Kanji Knight gameplay screenshot placeholder](docs/screenshot.png)
 
+## Play it
+
+Live at **https://kanji-knight.vercel.app/** (or your own Vercel domain), or open `index.html` locally — double-click works, no server needed.
+
 ## How to play
 
-1. Open `kanji-game.html` in any modern browser (double-click works — no server needed).
+1. Open `index.html` in any modern browser (double-click works — no server needed).
 2. On the start screen, choose whether to display readings as **Hiragana** or **Romaji**.
 3. Each round:
    - You get **5 seconds** to study a kanji.
@@ -19,7 +23,7 @@ A single-file browser game that drills the most-common Jōyō kanji. A knight st
 
 ## What's inside
 
-- Single self-contained `kanji-game.html` (~70 KB) — HTML, CSS, JS, SVG sprites, and ~2,000 Jōyō kanji entries all inline.
+- Single self-contained `index.html` (~70 KB) — HTML, CSS, JS, SVG sprites, and ~2,000 Jōyō kanji entries all inline.
 - No build step, no dependencies, no fetches — runs from `file://`.
 - Hiragana → Romaji conversion done at runtime via a Hepburn-style lookup table, so the dataset only stores hiragana.
 - Distractors are auto-picked from the rest of the dataset, preferring readings of the same length or that share characters with the correct answer.
@@ -36,9 +40,13 @@ One canonical reading per kanji (most-common kun-yomi where it exists, otherwise
 
 To swap a reading, find the entry and edit the `h:` value. To add new kanji, append to one of the `KANJI_DATA.push(...)` blocks.
 
-## Hosting on GitHub Pages
+## Hosting
 
-Rename `kanji-game.html` to `index.html`, push, then enable Pages in the repo settings (Source: `main` / `(root)`). The game will be live at `https://<your-user>.github.io/kanji-knight/`.
+This is a single static HTML file, so any static host works with zero config:
+
+- **Vercel** — connect the repo, accept the defaults. Vercel serves `index.html` from `/` automatically.
+- **GitHub Pages** — enable Pages in the repo settings (Source: `main` / `(root)`). The game will be live at `https://<your-user>.github.io/kanji-knight/`.
+- **Netlify / Cloudflare Pages** — same drill, point at the repo, no build command, no publish directory override needed.
 
 ## License
 
