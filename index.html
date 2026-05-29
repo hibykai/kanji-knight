@@ -94,14 +94,17 @@
     display: flex; gap: 18px; z-index: 8;
   }
   .option-card {
-    width: 200px; height: 120px;
+    width: 220px; height: 130px;
     background: #f6f1e0; border: 3px solid #ffd866; border-radius: 12px;
     box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-    font-size: 30px; font-weight: 700; color: #1a1a2e;
+    color: #1a1a2e;
     font-family: inherit; cursor: pointer; position: relative;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 12px 14px; gap: 6px; text-align: center;
   }
+  .option-card .reading { font-size: 28px; font-weight: 700; line-height: 1.1; }
+  .option-card .meaning { font-size: 14px; color: #4a4a5e; line-height: 1.2; font-weight: 500; }
   .option-card:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0,0,0,0.55); }
   .option-card:disabled { cursor: not-allowed; opacity: 0.65; }
   .option-card.wrong::after {
@@ -180,12 +183,77 @@
   #start-btn:hover, #restart-btn:hover { background: #ffe28b; transform: translateY(-2px); }
 
   #gameover-overlay .final-score { font-size: 28px; color: #ffd866; font-weight: 700; margin-bottom: 24px; }
+
+  /* Power-up inventory */
+  #powerups {
+    position: absolute; top: 64px; right: 24px;
+    display: flex; flex-direction: column; gap: 8px;
+    z-index: 11;
+  }
+  .powerup-btn {
+    background: rgba(36, 48, 87, 0.92);
+    border: 2px solid #ffd866;
+    border-radius: 12px;
+    padding: 8px 12px;
+    color: #ffd866;
+    font-family: inherit;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+    transition: transform 0.12s ease, background 0.12s ease;
+    min-width: 140px;
+  }
+  .powerup-btn:hover { transform: translateY(-2px); background: rgba(46,60,110,0.96); }
+  .powerup-btn .icon { font-size: 22px; line-height: 1; }
+  .powerup-btn .label { font-size: 13px; flex: 1; text-align: left; }
+  .powerup-btn .count {
+    background: #ffd866; color: #0f1422; border-radius: 999px;
+    padding: 2px 9px; font-size: 12px; min-width: 22px; text-align: center;
+  }
+
+  .powerup-flash {
+    position: fixed; top: 90px; left: 50%; transform: translateX(-50%);
+    background: #ffd866; color: #0f1422; padding: 12px 24px; border-radius: 999px;
+    font-weight: 700; z-index: 200; box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    animation: flashIn 0.5s ease, flashOut 0.5s ease 1.5s forwards;
+    font-size: 15px;
+  }
+  @keyframes flashIn {
+    from { opacity: 0; transform: translate(-50%, -16px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+  }
+  @keyframes flashOut {
+    to { opacity: 0; transform: translate(-50%, -16px); }
+  }
+
+  /* Power-up visual effects */
+  .knight.attacking { animation: knight-slash 0.4s ease; }
+  @keyframes knight-slash {
+    0%   { transform: translateX(0); }
+    40%  { transform: translateX(24px) scale(1.12); filter: brightness(1.4); }
+    100% { transform: translateX(0); }
+  }
+  .trex.frozen { filter: hue-rotate(160deg) brightness(1.15) saturate(1.4); }
+  .knight.shielded { position: absolute; }
+  .knight.shielded::after {
+    content: ''; position: absolute; inset: -10px;
+    border-radius: 50%; border: 3px solid #7ec8ff;
+    box-shadow: 0 0 18px rgba(126, 200, 255, 0.7);
+    animation: shieldPulse 1.5s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes shieldPulse {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50%      { opacity: 1;   transform: scale(1.06); }
+  }
 </style>
 </head>
 <body>
 
 <div id="arena">
   <div id="score-counter"><span id="score">0</span></div>
+  <div id="powerups"></div>
 
   <!-- Knight (faces right toward T-Rex) -->
   <svg class="knight" viewBox="0 0 80 100" xmlns="http://www.w3.org/2000/svg">
@@ -270,7 +338,7 @@
 
   <div id="start-overlay">
     <h1>Kanji Knight</h1>
-    <p>Read the kanji before the T-Rex eats you. You have 5 seconds to study, then pick the correct reading. Wrong answers make the T-Rex run faster.</p>
+    <p>Read the word before the T-Rex eats you. You have a few seconds to study, then pick the correct reading. Wrong answers make the T-Rex run faster.</p>
     <div class="label">Display readings as</div>
     <div class="hira-toggle">
       <button data-mode="hiragana" class="active">Hiragana</button>
@@ -405,13 +473,41 @@ const state = {
   studyCountdown: null,
   correctTimer: null,
   studyStart: 0,
+  // Power-up system
+  streak: 0,                                                  // consecutive correct
+  inventory: { blade: 0, freeze: 0, fifty: 0, shield: 0, skip: 0 },
+  shieldActive: false,
+  frozenUntil: 0,                                             // ms timestamp; trex paused until this
 };
 
+// Power-up registry
+const POWER_UPS = {
+  blade:  { name: 'Blade',  icon: '⚔️', label: 'Knock T-Rex back' },
+  freeze: { name: 'Freeze', icon: '❄️', label: 'Stop T-Rex 5s' },
+  fifty:  { name: '50/50',  icon: '⚖️', label: 'Remove a wrong card' },
+  shield: { name: 'Shield', icon: '🛡️', label: 'Absorb next wrong answer' },
+  skip:   { name: 'Skip',   icon: '⏭️', label: 'Skip this word' },
+};
+const POWER_UP_KEYS = Object.keys(POWER_UPS);
+
+// Difficulty score 0..1 (1 = hardest). Used to scale how often power-ups are earned.
+function difficultyScore() {
+  const sNorm = Math.max(0, Math.min(1, (15 - state.studySeconds) / 14));
+  const tNorm = Math.max(0, Math.min(1, (120 - state.travelSeconds) / 115));
+  return (sNorm + tNorm) / 2;
+}
+// Hot-streak threshold for a power-up grant: 3 at max difficulty, 8 at min.
+function streakThreshold() {
+  return Math.round(8 - 5 * difficultyScore());
+}
+
 // Cumulative JLPT pool: include selected level and all easier ones.
-// Because higher N number = easier kanji, e.j >= state.jlptLevel means
-// "this kanji is at the selected difficulty or easier".
+// Higher N number = easier, so e.j >= state.jlptLevel means
+// "this word is at the selected difficulty or easier".
+// Uses WORDS_DATA (the active dataset). KANJI_DATA is preserved in
+// the file for future use but no longer queried.
 function activePool() {
-  return KANJI_DATA.filter(e => e.j >= state.jlptLevel);
+  return WORDS_DATA.filter(e => e.j >= state.jlptLevel);
 }
 
 function baseSpeed() {
@@ -430,9 +526,21 @@ function shuffle(arr) {
   }
   return a;
 }
-function pickDistractors(correctH) {
-  const others = activePool().filter(e => e.h !== correctH);
-  if (others.length < 2) return ['?', '??'];
+// Returns 2 word entries whose readings are similar to correctEntry.h
+// (same length / shared chars). Excludes any entry sharing the same
+// reading OR same meaning as the correct one, so the distractor is
+// unambiguously a wrong answer.
+function pickDistractors(correctEntry) {
+  const others = activePool().filter(e =>
+    e.h !== correctEntry.h && e.e !== correctEntry.e
+  );
+  if (others.length < 2) {
+    return [
+      { w: '?', h: '?', e: '?' },
+      { w: '??', h: '??', e: '??' }
+    ];
+  }
+  const correctH = correctEntry.h;
   const scored = others.map(e => {
     let s = 0;
     if (e.h.length === correctH.length) s += 2;
@@ -440,24 +548,36 @@ function pickDistractors(correctH) {
     let shared = 0;
     for (const c of e.h) if (correctH.includes(c)) shared++;
     s += shared;
-    return { h: e.h, s };
+    return { entry: e, s };
   });
   scored.sort((a, b) => b.s - a.s);
   const top = scored.slice(0, Math.min(40, scored.length));
   const sh = shuffle(top);
   const result = [];
+  const usedReadings = new Set([correctH]);
   for (const c of sh) {
     if (result.length === 2) break;
-    if (!result.includes(c.h) && c.h !== correctH) result.push(c.h);
+    if (!usedReadings.has(c.entry.h)) {
+      result.push(c.entry);
+      usedReadings.add(c.entry.h);
+    }
   }
   while (result.length < 2) {
-    const r = pickRandom(others).h;
-    if (r !== correctH && !result.includes(r)) result.push(r);
+    const e = pickRandom(others);
+    if (!usedReadings.has(e.h)) {
+      result.push(e);
+      usedReadings.add(e.h);
+    }
   }
   return result;
 }
 function display(h) {
   return state.displayMode === 'hiragana' ? h : toRomaji(h);
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
 }
 
 /* ============================================================
@@ -470,10 +590,10 @@ function nextLevel() {
     return;
   }
   state.currentEntry = pickRandom(pool);
-  const dist = pickDistractors(state.currentEntry.h);
-  const all = shuffle([state.currentEntry.h, dist[0], dist[1]]);
+  const dist = pickDistractors(state.currentEntry);
+  const all = shuffle([state.currentEntry, dist[0], dist[1]]);
   state.options = all;
-  state.correctIdx = all.indexOf(state.currentEntry.h);
+  state.correctIdx = all.indexOf(state.currentEntry);
 
   // T-Rex keeps its current position across rounds — being quick rewards you.
   state.speed = 0;
@@ -483,7 +603,15 @@ function nextLevel() {
 
 function startStudyPhase() {
   state.phase = 'study';
-  document.getElementById('kanji-char').textContent = state.currentEntry.k;
+  const word = state.currentEntry.w;
+  const charEl = document.getElementById('kanji-char');
+  charEl.textContent = word;
+  // Scale font down for longer words so they fit the card
+  if (word.length === 1) charEl.style.fontSize = '160px';
+  else if (word.length === 2) charEl.style.fontSize = '110px';
+  else if (word.length === 3) charEl.style.fontSize = '80px';
+  else if (word.length === 4) charEl.style.fontSize = '64px';
+  else charEl.style.fontSize = '52px';
   document.getElementById('kanji-card').classList.remove('hidden');
   document.getElementById('options-row').classList.add('hidden');
   state.studyStart = performance.now();
@@ -505,10 +633,13 @@ function startSelectPhase() {
   document.getElementById('kanji-card').classList.add('hidden');
   const btns = document.querySelectorAll('.option-card');
   btns.forEach((b, i) => {
-    b.textContent = display(state.options[i]);
+    const opt = state.options[i];
+    b.innerHTML =
+      '<div class="reading">' + escapeHtml(display(opt.h)) + '</div>' +
+      '<div class="meaning">' + escapeHtml(opt.e) + '</div>';
     b.classList.remove('wrong', 'right');
     b.disabled = false;
-    b.dataset.h = state.options[i];
+    b.dataset.h = opt.h;
   });
   document.getElementById('options-row').classList.remove('hidden');
   state.speed = baseSpeed();
@@ -523,7 +654,13 @@ function onCardClick(idx) {
     btns.forEach(b => b.disabled = true);
     state.speed = 0;
     state.score++;
+    state.streak++;
     document.getElementById('score').textContent = state.score;
+    // Power-up grant on difficulty-scaled hot streak
+    if (state.streak >= streakThreshold()) {
+      state.streak = 0;
+      grantRandomPowerUp();
+    }
     state.phase = 'correct';
     if (state.correctTimer) clearTimeout(state.correctTimer);
     state.correctTimer = setTimeout(() => {
@@ -533,8 +670,119 @@ function onCardClick(idx) {
   } else {
     btns[idx].classList.add('wrong');
     btns[idx].disabled = true;
-    state.speed = baseSpeed() * FAST_MULT;
+    state.streak = 0;
+    if (state.shieldActive) {
+      // Shield absorbs the speed-up
+      state.shieldActive = false;
+      document.querySelector('.knight').classList.remove('shielded');
+      // optional brief shield-break visual
+      const flash = document.createElement('div');
+      flash.className = 'powerup-flash';
+      flash.textContent = '🛡️ Shield absorbed the hit!';
+      document.body.appendChild(flash);
+      setTimeout(() => flash.remove(), 1800);
+    } else {
+      state.speed = baseSpeed() * FAST_MULT;
+    }
   }
+}
+
+/* ============================================================
+   POWER-UP MECHANICS
+   ============================================================ */
+function grantRandomPowerUp() {
+  const id = POWER_UP_KEYS[Math.floor(Math.random() * POWER_UP_KEYS.length)];
+  state.inventory[id]++;
+  renderInventory();
+  flashPowerUpGrant(id);
+}
+
+function renderInventory() {
+  const el = document.getElementById('powerups');
+  let html = '';
+  for (const id of POWER_UP_KEYS) {
+    if (state.inventory[id] > 0) {
+      const p = POWER_UPS[id];
+      html +=
+        '<button class="powerup-btn" data-pid="' + id + '" title="' + p.label + '">' +
+          '<span class="icon">' + p.icon + '</span>' +
+          '<span class="label">' + p.name + '</span>' +
+          '<span class="count">' + state.inventory[id] + '</span>' +
+        '</button>';
+    }
+  }
+  el.innerHTML = html;
+  el.querySelectorAll('.powerup-btn').forEach(btn => {
+    btn.addEventListener('click', () => usePowerUp(btn.dataset.pid));
+  });
+}
+
+function flashPowerUpGrant(id) {
+  const p = POWER_UPS[id];
+  const div = document.createElement('div');
+  div.className = 'powerup-flash';
+  div.textContent = 'Power-up: ' + p.icon + ' ' + p.name + '!';
+  document.body.appendChild(div);
+  setTimeout(() => div.remove(), 2200);
+}
+
+function usePowerUp(id) {
+  if (state.phase !== 'study' && state.phase !== 'select') return;
+  if (!state.inventory[id]) return;
+  state.inventory[id]--;
+  renderInventory();
+  switch (id) {
+    case 'blade':  bladeAttack(); break;
+    case 'freeze': timeFreeze(); break;
+    case 'fifty':  fiftyFifty(); break;
+    case 'shield': activateShield(); break;
+    case 'skip':   skipWord(); break;
+  }
+}
+
+function bladeAttack() {
+  state.trexX = Math.min(TREX_START_X, state.trexX + 18);
+  updateTrexPosition();
+  const knight = document.querySelector('.knight');
+  knight.classList.add('attacking');
+  setTimeout(() => knight.classList.remove('attacking'), 400);
+}
+
+function timeFreeze() {
+  state.frozenUntil = performance.now() + 5000;
+  const trex = document.querySelector('.trex');
+  trex.classList.add('frozen');
+  setTimeout(() => trex.classList.remove('frozen'), 5000);
+}
+
+function fiftyFifty() {
+  if (state.phase !== 'select') return;
+  const btns = document.querySelectorAll('.option-card');
+  const candidates = [];
+  btns.forEach((b, i) => {
+    if (i !== state.correctIdx && !b.classList.contains('wrong')) candidates.push(i);
+  });
+  if (candidates.length === 0) return;
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  btns[pick].classList.add('wrong');
+  btns[pick].disabled = true;
+}
+
+function activateShield() {
+  if (state.shieldActive) return; // already active; refund
+  state.shieldActive = true;
+  document.querySelector('.knight').classList.add('shielded');
+}
+
+function skipWord() {
+  if (state.studyTimer) clearTimeout(state.studyTimer);
+  if (state.studyCountdown) clearInterval(state.studyCountdown);
+  state.speed = 0;
+  document.getElementById('kanji-card').classList.add('hidden');
+  document.getElementById('options-row').classList.add('hidden');
+  state.phase = 'correct';
+  if (state.correctTimer) clearTimeout(state.correctTimer);
+  state.correctTimer = setTimeout(nextLevel, 300);
 }
 
 function gameOver() {
@@ -558,6 +806,13 @@ function startGame() {
   document.getElementById('score').textContent = '0';
   state.trexX = TREX_START_X;
   state.speed = 0;
+  state.streak = 0;
+  state.inventory = { blade: 0, freeze: 0, fifty: 0, shield: 0, skip: 0 };
+  state.shieldActive = false;
+  state.frozenUntil = 0;
+  document.querySelector('.knight').classList.remove('shielded');
+  document.querySelector('.trex').classList.remove('frozen', 'chomp');
+  renderInventory();
   updateTrexPosition();
   document.getElementById('start-overlay').classList.add('hidden');
   document.getElementById('gameover-overlay').classList.add('hidden');
@@ -573,7 +828,8 @@ function tick(ts) {
   if (state.lastTs === 0) state.lastTs = ts;
   const dt = (ts - state.lastTs) / 1000;
   state.lastTs = ts;
-  if (state.phase === 'select' && state.speed > 0) {
+  const frozen = ts < state.frozenUntil;
+  if (state.phase === 'select' && state.speed > 0 && !frozen) {
     state.trexX -= state.speed * dt;
     if (state.trexX <= KNIGHT_X) {
       state.trexX = KNIGHT_X;
@@ -1249,6 +1505,581 @@ pushChunk(1,
 );
 
 </script>
+
+<script>
+/* ============================================================
+   WORDS DATASET — JLPT-themed vocabulary used by the active quiz
+   Each entry: { w: written word (kanji+kana), h: hiragana reading,
+                 e: English meaning, j: JLPT level (set by pushWords) }
+   Pushed easiest-first (N5 → N1) so runtime dedupe naturally keeps
+   each word at its easiest level. Same cumulative semantics as the
+   kanji dataset: selecting N3 includes everything N5..N3.
+   ============================================================ */
+const WORDS_DATA = [];
+function pushWords(level, ...entries) {
+  for (const e of entries) { e.j = level; WORDS_DATA.push(e); }
+}
+
+// N5: ~100 most essential words (pronouns, family, time, food, basic verbs/adj)
+pushWords(5,
+  {w:"私",h:"わたし",e:"I; me"},
+  {w:"あなた",h:"あなた",e:"you"},
+  {w:"人",h:"ひと",e:"person"},
+  {w:"男",h:"おとこ",e:"man"},
+  {w:"女",h:"おんな",e:"woman"},
+  {w:"友達",h:"ともだち",e:"friend"},
+  {w:"父",h:"ちち",e:"father"},
+  {w:"母",h:"はは",e:"mother"},
+  {w:"兄",h:"あに",e:"older brother"},
+  {w:"姉",h:"あね",e:"older sister"},
+  {w:"弟",h:"おとうと",e:"younger brother"},
+  {w:"妹",h:"いもうと",e:"younger sister"},
+  {w:"家族",h:"かぞく",e:"family"},
+  {w:"子供",h:"こども",e:"child"},
+  {w:"今日",h:"きょう",e:"today"},
+  {w:"明日",h:"あした",e:"tomorrow"},
+  {w:"昨日",h:"きのう",e:"yesterday"},
+  {w:"今",h:"いま",e:"now"},
+  {w:"朝",h:"あさ",e:"morning"},
+  {w:"昼",h:"ひる",e:"noon; daytime"},
+  {w:"夜",h:"よる",e:"night"},
+  {w:"時間",h:"じかん",e:"time"},
+  {w:"年",h:"とし",e:"year"},
+  {w:"月曜日",h:"げつようび",e:"Monday"},
+  {w:"火曜日",h:"かようび",e:"Tuesday"},
+  {w:"水曜日",h:"すいようび",e:"Wednesday"},
+  {w:"木曜日",h:"もくようび",e:"Thursday"},
+  {w:"金曜日",h:"きんようび",e:"Friday"},
+  {w:"土曜日",h:"どようび",e:"Saturday"},
+  {w:"日曜日",h:"にちようび",e:"Sunday"},
+  {w:"水",h:"みず",e:"water"},
+  {w:"お茶",h:"おちゃ",e:"tea"},
+  {w:"ご飯",h:"ごはん",e:"rice; meal"},
+  {w:"パン",h:"ぱん",e:"bread"},
+  {w:"肉",h:"にく",e:"meat"},
+  {w:"魚",h:"さかな",e:"fish"},
+  {w:"卵",h:"たまご",e:"egg"},
+  {w:"果物",h:"くだもの",e:"fruit"},
+  {w:"野菜",h:"やさい",e:"vegetable"},
+  {w:"学校",h:"がっこう",e:"school"},
+  {w:"先生",h:"せんせい",e:"teacher"},
+  {w:"学生",h:"がくせい",e:"student"},
+  {w:"本",h:"ほん",e:"book"},
+  {w:"鞄",h:"かばん",e:"bag"},
+  {w:"家",h:"いえ",e:"house; home"},
+  {w:"駅",h:"えき",e:"station"},
+  {w:"店",h:"みせ",e:"shop; store"},
+  {w:"公園",h:"こうえん",e:"park"},
+  {w:"図書館",h:"としょかん",e:"library"},
+  {w:"大学",h:"だいがく",e:"university"},
+  {w:"雨",h:"あめ",e:"rain"},
+  {w:"雪",h:"ゆき",e:"snow"},
+  {w:"風",h:"かぜ",e:"wind"},
+  {w:"空",h:"そら",e:"sky"},
+  {w:"山",h:"やま",e:"mountain"},
+  {w:"川",h:"かわ",e:"river"},
+  {w:"海",h:"うみ",e:"sea; ocean"},
+  {w:"花",h:"はな",e:"flower"},
+  {w:"木",h:"き",e:"tree; wood"},
+  {w:"車",h:"くるま",e:"car"},
+  {w:"電車",h:"でんしゃ",e:"train"},
+  {w:"自転車",h:"じてんしゃ",e:"bicycle"},
+  {w:"飛行機",h:"ひこうき",e:"airplane"},
+  {w:"犬",h:"いぬ",e:"dog"},
+  {w:"猫",h:"ねこ",e:"cat"},
+  {w:"鳥",h:"とり",e:"bird"},
+  {w:"赤",h:"あか",e:"red"},
+  {w:"青",h:"あお",e:"blue"},
+  {w:"黒",h:"くろ",e:"black"},
+  {w:"白",h:"しろ",e:"white"},
+  {w:"食べる",h:"たべる",e:"to eat"},
+  {w:"飲む",h:"のむ",e:"to drink"},
+  {w:"行く",h:"いく",e:"to go"},
+  {w:"来る",h:"くる",e:"to come"},
+  {w:"見る",h:"みる",e:"to see; to watch"},
+  {w:"聞く",h:"きく",e:"to listen; to ask"},
+  {w:"読む",h:"よむ",e:"to read"},
+  {w:"書く",h:"かく",e:"to write"},
+  {w:"話す",h:"はなす",e:"to speak"},
+  {w:"買う",h:"かう",e:"to buy"},
+  {w:"売る",h:"うる",e:"to sell"},
+  {w:"立つ",h:"たつ",e:"to stand"},
+  {w:"座る",h:"すわる",e:"to sit"},
+  {w:"寝る",h:"ねる",e:"to sleep"},
+  {w:"起きる",h:"おきる",e:"to wake up"},
+  {w:"勉強",h:"べんきょう",e:"study"},
+  {w:"仕事",h:"しごと",e:"work; job"},
+  {w:"大きい",h:"おおきい",e:"big"},
+  {w:"小さい",h:"ちいさい",e:"small"},
+  {w:"高い",h:"たかい",e:"tall; expensive"},
+  {w:"安い",h:"やすい",e:"cheap"},
+  {w:"新しい",h:"あたらしい",e:"new"},
+  {w:"古い",h:"ふるい",e:"old"},
+  {w:"暑い",h:"あつい",e:"hot (weather)"},
+  {w:"寒い",h:"さむい",e:"cold (weather)"},
+  {w:"美味しい",h:"おいしい",e:"delicious"},
+  {w:"面白い",h:"おもしろい",e:"interesting; fun"},
+  {w:"悪い",h:"わるい",e:"bad"},
+  {w:"何",h:"なに",e:"what"},
+  {w:"誰",h:"だれ",e:"who"},
+  {w:"どこ",h:"どこ",e:"where"}
+);
+
+// N4: ~100 next-tier words (more verbs, adjectives, common nouns)
+pushWords(4,
+  {w:"頑張る",h:"がんばる",e:"to do one's best"},
+  {w:"教える",h:"おしえる",e:"to teach"},
+  {w:"覚える",h:"おぼえる",e:"to remember"},
+  {w:"忘れる",h:"わすれる",e:"to forget"},
+  {w:"分かる",h:"わかる",e:"to understand"},
+  {w:"知る",h:"しる",e:"to know"},
+  {w:"思う",h:"おもう",e:"to think"},
+  {w:"考える",h:"かんがえる",e:"to consider"},
+  {w:"使う",h:"つかう",e:"to use"},
+  {w:"作る",h:"つくる",e:"to make"},
+  {w:"始める",h:"はじめる",e:"to begin"},
+  {w:"終わる",h:"おわる",e:"to end"},
+  {w:"続ける",h:"つづける",e:"to continue"},
+  {w:"待つ",h:"まつ",e:"to wait"},
+  {w:"急ぐ",h:"いそぐ",e:"to hurry"},
+  {w:"歩く",h:"あるく",e:"to walk"},
+  {w:"走る",h:"はしる",e:"to run"},
+  {w:"泳ぐ",h:"およぐ",e:"to swim"},
+  {w:"乗る",h:"のる",e:"to ride; to board"},
+  {w:"降りる",h:"おりる",e:"to get off"},
+  {w:"出る",h:"でる",e:"to exit; to leave"},
+  {w:"入る",h:"はいる",e:"to enter"},
+  {w:"帰る",h:"かえる",e:"to return home"},
+  {w:"取る",h:"とる",e:"to take"},
+  {w:"持つ",h:"もつ",e:"to hold; to have"},
+  {w:"会う",h:"あう",e:"to meet"},
+  {w:"住む",h:"すむ",e:"to live (reside)"},
+  {w:"働く",h:"はたらく",e:"to work"},
+  {w:"歌う",h:"うたう",e:"to sing"},
+  {w:"踊る",h:"おどる",e:"to dance"},
+  {w:"遊ぶ",h:"あそぶ",e:"to play"},
+  {w:"楽しい",h:"たのしい",e:"fun; enjoyable"},
+  {w:"嬉しい",h:"うれしい",e:"happy"},
+  {w:"悲しい",h:"かなしい",e:"sad"},
+  {w:"怖い",h:"こわい",e:"scary"},
+  {w:"難しい",h:"むずかしい",e:"difficult"},
+  {w:"易しい",h:"やさしい",e:"easy"},
+  {w:"忙しい",h:"いそがしい",e:"busy"},
+  {w:"暇",h:"ひま",e:"free time"},
+  {w:"元気",h:"げんき",e:"healthy; energetic"},
+  {w:"病気",h:"びょうき",e:"illness"},
+  {w:"問題",h:"もんだい",e:"problem; question"},
+  {w:"質問",h:"しつもん",e:"question"},
+  {w:"答え",h:"こたえ",e:"answer"},
+  {w:"意味",h:"いみ",e:"meaning"},
+  {w:"音楽",h:"おんがく",e:"music"},
+  {w:"映画",h:"えいが",e:"movie"},
+  {w:"歌",h:"うた",e:"song"},
+  {w:"写真",h:"しゃしん",e:"photograph"},
+  {w:"絵",h:"え",e:"picture; drawing"},
+  {w:"色",h:"いろ",e:"color"},
+  {w:"形",h:"かたち",e:"shape"},
+  {w:"声",h:"こえ",e:"voice"},
+  {w:"言葉",h:"ことば",e:"word; language"},
+  {w:"手紙",h:"てがみ",e:"letter"},
+  {w:"電話",h:"でんわ",e:"telephone"},
+  {w:"道",h:"みち",e:"road; way"},
+  {w:"場所",h:"ばしょ",e:"place"},
+  {w:"部屋",h:"へや",e:"room"},
+  {w:"台所",h:"だいどころ",e:"kitchen"},
+  {w:"風呂",h:"ふろ",e:"bath"},
+  {w:"窓",h:"まど",e:"window"},
+  {w:"机",h:"つくえ",e:"desk"},
+  {w:"椅子",h:"いす",e:"chair"},
+  {w:"病院",h:"びょういん",e:"hospital"},
+  {w:"銀行",h:"ぎんこう",e:"bank"},
+  {w:"郵便局",h:"ゆうびんきょく",e:"post office"},
+  {w:"会社",h:"かいしゃ",e:"company"},
+  {w:"国",h:"くに",e:"country"},
+  {w:"町",h:"まち",e:"town"},
+  {w:"村",h:"むら",e:"village"},
+  {w:"世界",h:"せかい",e:"world"},
+  {w:"季節",h:"きせつ",e:"season"},
+  {w:"春",h:"はる",e:"spring"},
+  {w:"夏",h:"なつ",e:"summer"},
+  {w:"秋",h:"あき",e:"autumn"},
+  {w:"冬",h:"ふゆ",e:"winter"},
+  {w:"星",h:"ほし",e:"star"},
+  {w:"月",h:"つき",e:"moon"},
+  {w:"太陽",h:"たいよう",e:"sun"},
+  {w:"地図",h:"ちず",e:"map"},
+  {w:"旅行",h:"りょこう",e:"travel"},
+  {w:"切符",h:"きっぷ",e:"ticket"},
+  {w:"地下鉄",h:"ちかてつ",e:"subway"},
+  {w:"バス",h:"ばす",e:"bus"},
+  {w:"値段",h:"ねだん",e:"price"},
+  {w:"お金",h:"おかね",e:"money"},
+  {w:"財布",h:"さいふ",e:"wallet"},
+  {w:"鍵",h:"かぎ",e:"key"},
+  {w:"時計",h:"とけい",e:"clock; watch"},
+  {w:"眼鏡",h:"めがね",e:"glasses"},
+  {w:"洋服",h:"ようふく",e:"Western clothes"},
+  {w:"着物",h:"きもの",e:"kimono"},
+  {w:"靴",h:"くつ",e:"shoes"},
+  {w:"帽子",h:"ぼうし",e:"hat"},
+  {w:"鉛筆",h:"えんぴつ",e:"pencil"},
+  {w:"紙",h:"かみ",e:"paper"},
+  {w:"辞書",h:"じしょ",e:"dictionary"},
+  {w:"新聞",h:"しんぶん",e:"newspaper"},
+  {w:"雑誌",h:"ざっし",e:"magazine"},
+  {w:"漫画",h:"まんが",e:"manga"},
+  {w:"親切",h:"しんせつ",e:"kind"},
+  {w:"有名",h:"ゆうめい",e:"famous"},
+  {w:"便利",h:"べんり",e:"convenient"},
+  {w:"特別",h:"とくべつ",e:"special"},
+  {w:"簡単",h:"かんたん",e:"simple; easy"},
+  {w:"安全",h:"あんぜん",e:"safe"},
+  {w:"危ない",h:"あぶない",e:"dangerous"},
+  {w:"必要",h:"ひつよう",e:"necessary"},
+  {w:"色々",h:"いろいろ",e:"various"},
+  {w:"全部",h:"ぜんぶ",e:"all"},
+  {w:"沢山",h:"たくさん",e:"many; a lot"},
+  {w:"少し",h:"すこし",e:"a little"},
+  {w:"時々",h:"ときどき",e:"sometimes"}
+);
+
+// N3: ~100 abstract / common-news vocab
+pushWords(3,
+  {w:"経験",h:"けいけん",e:"experience"},
+  {w:"練習",h:"れんしゅう",e:"practice"},
+  {w:"努力",h:"どりょく",e:"effort"},
+  {w:"成功",h:"せいこう",e:"success"},
+  {w:"失敗",h:"しっぱい",e:"failure"},
+  {w:"計画",h:"けいかく",e:"plan"},
+  {w:"目的",h:"もくてき",e:"purpose; goal"},
+  {w:"目標",h:"もくひょう",e:"target; goal"},
+  {w:"結果",h:"けっか",e:"result"},
+  {w:"原因",h:"げんいん",e:"cause"},
+  {w:"理由",h:"りゆう",e:"reason"},
+  {w:"説明",h:"せつめい",e:"explanation"},
+  {w:"確認",h:"かくにん",e:"confirmation"},
+  {w:"報告",h:"ほうこく",e:"report"},
+  {w:"発表",h:"はっぴょう",e:"announcement"},
+  {w:"会議",h:"かいぎ",e:"meeting"},
+  {w:"約束",h:"やくそく",e:"promise; appointment"},
+  {w:"予定",h:"よてい",e:"plan; schedule"},
+  {w:"予約",h:"よやく",e:"reservation"},
+  {w:"準備",h:"じゅんび",e:"preparation"},
+  {w:"用意",h:"ようい",e:"preparation"},
+  {w:"完成",h:"かんせい",e:"completion"},
+  {w:"開始",h:"かいし",e:"start"},
+  {w:"中止",h:"ちゅうし",e:"discontinuation"},
+  {w:"変更",h:"へんこう",e:"change; modification"},
+  {w:"連絡",h:"れんらく",e:"contact"},
+  {w:"相談",h:"そうだん",e:"consultation"},
+  {w:"返事",h:"へんじ",e:"reply"},
+  {w:"挨拶",h:"あいさつ",e:"greeting"},
+  {w:"招待",h:"しょうたい",e:"invitation"},
+  {w:"歓迎",h:"かんげい",e:"welcome"},
+  {w:"感謝",h:"かんしゃ",e:"gratitude"},
+  {w:"謝罪",h:"しゃざい",e:"apology"},
+  {w:"許可",h:"きょか",e:"permission"},
+  {w:"禁止",h:"きんし",e:"prohibition"},
+  {w:"注意",h:"ちゅうい",e:"caution; warning"},
+  {w:"警告",h:"けいこく",e:"warning"},
+  {w:"危険",h:"きけん",e:"danger"},
+  {w:"安心",h:"あんしん",e:"peace of mind"},
+  {w:"心配",h:"しんぱい",e:"worry"},
+  {w:"緊張",h:"きんちょう",e:"tension"},
+  {w:"興奮",h:"こうふん",e:"excitement"},
+  {w:"感動",h:"かんどう",e:"deep emotion"},
+  {w:"驚き",h:"おどろき",e:"surprise"},
+  {w:"喜び",h:"よろこび",e:"joy"},
+  {w:"怒り",h:"いかり",e:"anger"},
+  {w:"恥ずかしい",h:"はずかしい",e:"embarrassed"},
+  {w:"懐かしい",h:"なつかしい",e:"nostalgic"},
+  {w:"優しい",h:"やさしい",e:"kind; gentle"},
+  {w:"厳しい",h:"きびしい",e:"strict"},
+  {w:"激しい",h:"はげしい",e:"violent; intense"},
+  {w:"静か",h:"しずか",e:"quiet"},
+  {w:"うるさい",h:"うるさい",e:"noisy"},
+  {w:"暗い",h:"くらい",e:"dark"},
+  {w:"明るい",h:"あかるい",e:"bright; cheerful"},
+  {w:"環境",h:"かんきょう",e:"environment"},
+  {w:"自然",h:"しぜん",e:"nature"},
+  {w:"動物",h:"どうぶつ",e:"animal"},
+  {w:"植物",h:"しょくぶつ",e:"plant"},
+  {w:"地球",h:"ちきゅう",e:"Earth"},
+  {w:"宇宙",h:"うちゅう",e:"universe; space"},
+  {w:"歴史",h:"れきし",e:"history"},
+  {w:"文化",h:"ぶんか",e:"culture"},
+  {w:"政治",h:"せいじ",e:"politics"},
+  {w:"経済",h:"けいざい",e:"economy"},
+  {w:"社会",h:"しゃかい",e:"society"},
+  {w:"法律",h:"ほうりつ",e:"law"},
+  {w:"事件",h:"じけん",e:"incident; case"},
+  {w:"事故",h:"じこ",e:"accident"},
+  {w:"戦争",h:"せんそう",e:"war"},
+  {w:"平和",h:"へいわ",e:"peace"},
+  {w:"教育",h:"きょういく",e:"education"},
+  {w:"研究",h:"けんきゅう",e:"research"},
+  {w:"科学",h:"かがく",e:"science"},
+  {w:"医者",h:"いしゃ",e:"doctor"},
+  {w:"看護師",h:"かんごし",e:"nurse"},
+  {w:"治療",h:"ちりょう",e:"treatment"},
+  {w:"薬",h:"くすり",e:"medicine"},
+  {w:"健康",h:"けんこう",e:"health"},
+  {w:"運動",h:"うんどう",e:"exercise"},
+  {w:"散歩",h:"さんぽ",e:"walk; stroll"},
+  {w:"食事",h:"しょくじ",e:"meal"},
+  {w:"料理",h:"りょうり",e:"cooking; cuisine"},
+  {w:"味",h:"あじ",e:"taste; flavor"},
+  {w:"音",h:"おと",e:"sound"},
+  {w:"光",h:"ひかり",e:"light"},
+  {w:"夢",h:"ゆめ",e:"dream"},
+  {w:"思い出",h:"おもいで",e:"memory; recollection"},
+  {w:"将来",h:"しょうらい",e:"future"},
+  {w:"過去",h:"かこ",e:"past"},
+  {w:"現在",h:"げんざい",e:"present"},
+  {w:"未来",h:"みらい",e:"future"},
+  {w:"時代",h:"じだい",e:"era; period"},
+  {w:"瞬間",h:"しゅんかん",e:"moment; instant"},
+  {w:"場合",h:"ばあい",e:"case; situation"},
+  {w:"状況",h:"じょうきょう",e:"situation"},
+  {w:"様子",h:"ようす",e:"appearance; situation"},
+  {w:"性格",h:"せいかく",e:"personality"},
+  {w:"能力",h:"のうりょく",e:"ability"},
+  {w:"才能",h:"さいのう",e:"talent"},
+  {w:"成長",h:"せいちょう",e:"growth"},
+  {w:"変化",h:"へんか",e:"change"},
+  {w:"技術",h:"ぎじゅつ",e:"technology; skill"},
+  {w:"機械",h:"きかい",e:"machine"},
+  {w:"商品",h:"しょうひん",e:"merchandise"}
+);
+
+// N2: ~100 formal / business / civic vocab
+pushWords(2,
+  {w:"重要",h:"じゅうよう",e:"important"},
+  {w:"主要",h:"しゅよう",e:"main; principal"},
+  {w:"基本",h:"きほん",e:"basis; foundation"},
+  {w:"基準",h:"きじゅん",e:"standard"},
+  {w:"基礎",h:"きそ",e:"foundation; basics"},
+  {w:"原則",h:"げんそく",e:"principle"},
+  {w:"手段",h:"しゅだん",e:"means"},
+  {w:"方法",h:"ほうほう",e:"method"},
+  {w:"方針",h:"ほうしん",e:"policy"},
+  {w:"政策",h:"せいさく",e:"policy (govt)"},
+  {w:"制度",h:"せいど",e:"system; institution"},
+  {w:"組織",h:"そしき",e:"organization"},
+  {w:"団体",h:"だんたい",e:"group; organization"},
+  {w:"代表",h:"だいひょう",e:"representative"},
+  {w:"指導",h:"しどう",e:"guidance"},
+  {w:"管理",h:"かんり",e:"management"},
+  {w:"経営",h:"けいえい",e:"management; business"},
+  {w:"事業",h:"じぎょう",e:"enterprise; project"},
+  {w:"産業",h:"さんぎょう",e:"industry"},
+  {w:"農業",h:"のうぎょう",e:"agriculture"},
+  {w:"貿易",h:"ぼうえき",e:"trade"},
+  {w:"輸入",h:"ゆにゅう",e:"import"},
+  {w:"輸出",h:"ゆしゅつ",e:"export"},
+  {w:"生産",h:"せいさん",e:"production"},
+  {w:"消費",h:"しょうひ",e:"consumption"},
+  {w:"需要",h:"じゅよう",e:"demand"},
+  {w:"供給",h:"きょうきゅう",e:"supply"},
+  {w:"市場",h:"しじょう",e:"market"},
+  {w:"競争",h:"きょうそう",e:"competition"},
+  {w:"独立",h:"どくりつ",e:"independence"},
+  {w:"自由",h:"じゆう",e:"freedom"},
+  {w:"平等",h:"びょうどう",e:"equality"},
+  {w:"権利",h:"けんり",e:"right (entitlement)"},
+  {w:"義務",h:"ぎむ",e:"duty; obligation"},
+  {w:"責任",h:"せきにん",e:"responsibility"},
+  {w:"役割",h:"やくわり",e:"role"},
+  {w:"立場",h:"たちば",e:"position; standpoint"},
+  {w:"地位",h:"ちい",e:"position; status"},
+  {w:"職業",h:"しょくぎょう",e:"profession"},
+  {w:"職場",h:"しょくば",e:"workplace"},
+  {w:"給料",h:"きゅうりょう",e:"salary"},
+  {w:"収入",h:"しゅうにゅう",e:"income"},
+  {w:"税金",h:"ぜいきん",e:"tax"},
+  {w:"財産",h:"ざいさん",e:"property; wealth"},
+  {w:"貯金",h:"ちょきん",e:"savings"},
+  {w:"投資",h:"とうし",e:"investment"},
+  {w:"利益",h:"りえき",e:"profit"},
+  {w:"損失",h:"そんしつ",e:"loss"},
+  {w:"価値",h:"かち",e:"value"},
+  {w:"価格",h:"かかく",e:"price"},
+  {w:"費用",h:"ひよう",e:"expense"},
+  {w:"効果",h:"こうか",e:"effect"},
+  {w:"効率",h:"こうりつ",e:"efficiency"},
+  {w:"品質",h:"ひんしつ",e:"quality"},
+  {w:"性能",h:"せいのう",e:"performance"},
+  {w:"機能",h:"きのう",e:"function"},
+  {w:"特徴",h:"とくちょう",e:"characteristic"},
+  {w:"傾向",h:"けいこう",e:"tendency"},
+  {w:"範囲",h:"はんい",e:"range; scope"},
+  {w:"程度",h:"ていど",e:"degree; extent"},
+  {w:"段階",h:"だんかい",e:"stage; phase"},
+  {w:"順序",h:"じゅんじょ",e:"order; sequence"},
+  {w:"種類",h:"しゅるい",e:"kind; type"},
+  {w:"共通",h:"きょうつう",e:"common; shared"},
+  {w:"全体",h:"ぜんたい",e:"whole; entirety"},
+  {w:"部分",h:"ぶぶん",e:"part; portion"},
+  {w:"中心",h:"ちゅうしん",e:"center"},
+  {w:"周辺",h:"しゅうへん",e:"surroundings"},
+  {w:"地域",h:"ちいき",e:"region"},
+  {w:"地方",h:"ちほう",e:"region; countryside"},
+  {w:"都市",h:"とし",e:"city"},
+  {w:"郊外",h:"こうがい",e:"suburbs"},
+  {w:"田舎",h:"いなか",e:"countryside"},
+  {w:"住民",h:"じゅうみん",e:"resident"},
+  {w:"国民",h:"こくみん",e:"citizen"},
+  {w:"人口",h:"じんこう",e:"population"},
+  {w:"世代",h:"せだい",e:"generation"},
+  {w:"若者",h:"わかもの",e:"young people"},
+  {w:"高齢者",h:"こうれいしゃ",e:"elderly people"},
+  {w:"夫婦",h:"ふうふ",e:"married couple"},
+  {w:"親戚",h:"しんせき",e:"relative"},
+  {w:"近所",h:"きんじょ",e:"neighborhood"},
+  {w:"恋人",h:"こいびと",e:"lover; sweetheart"},
+  {w:"敵",h:"てき",e:"enemy"},
+  {w:"味方",h:"みかた",e:"ally"},
+  {w:"仲間",h:"なかま",e:"companion"},
+  {w:"同僚",h:"どうりょう",e:"colleague"},
+  {w:"上司",h:"じょうし",e:"superior; boss"},
+  {w:"部下",h:"ぶか",e:"subordinate"},
+  {w:"後輩",h:"こうはい",e:"junior (in school/work)"},
+  {w:"先輩",h:"せんぱい",e:"senior (in school/work)"},
+  {w:"主婦",h:"しゅふ",e:"housewife"},
+  {w:"独身",h:"どくしん",e:"single (unmarried)"},
+  {w:"結婚",h:"けっこん",e:"marriage"},
+  {w:"離婚",h:"りこん",e:"divorce"},
+  {w:"祭り",h:"まつり",e:"festival"},
+  {w:"儀式",h:"ぎしき",e:"ceremony"},
+  {w:"行動",h:"こうどう",e:"action; behavior"},
+  {w:"運命",h:"うんめい",e:"destiny"},
+  {w:"幸運",h:"こううん",e:"good fortune"},
+  {w:"奇跡",h:"きせき",e:"miracle"},
+  {w:"偶然",h:"ぐうぜん",e:"by chance"}
+);
+
+// N1: ~100 advanced abstract / formal vocab
+pushWords(1,
+  {w:"概念",h:"がいねん",e:"concept"},
+  {w:"理念",h:"りねん",e:"ideology"},
+  {w:"理論",h:"りろん",e:"theory"},
+  {w:"実践",h:"じっせん",e:"practice; implementation"},
+  {w:"実現",h:"じつげん",e:"realization"},
+  {w:"実施",h:"じっし",e:"execution; implementation"},
+  {w:"実行",h:"じっこう",e:"execution"},
+  {w:"認識",h:"にんしき",e:"recognition; awareness"},
+  {w:"意識",h:"いしき",e:"consciousness"},
+  {w:"無意識",h:"むいしき",e:"unconscious"},
+  {w:"直感",h:"ちょっかん",e:"intuition"},
+  {w:"想像",h:"そうぞう",e:"imagination"},
+  {w:"創造",h:"そうぞう",e:"creation"},
+  {w:"前提",h:"ぜんてい",e:"premise"},
+  {w:"仮説",h:"かせつ",e:"hypothesis"},
+  {w:"検証",h:"けんしょう",e:"verification"},
+  {w:"分析",h:"ぶんせき",e:"analysis"},
+  {w:"統計",h:"とうけい",e:"statistics"},
+  {w:"調査",h:"ちょうさ",e:"investigation; survey"},
+  {w:"観察",h:"かんさつ",e:"observation"},
+  {w:"判断",h:"はんだん",e:"judgment"},
+  {w:"評価",h:"ひょうか",e:"evaluation"},
+  {w:"批判",h:"ひはん",e:"criticism"},
+  {w:"非難",h:"ひなん",e:"blame; reproach"},
+  {w:"称賛",h:"しょうさん",e:"praise"},
+  {w:"推奨",h:"すいしょう",e:"recommendation"},
+  {w:"忠告",h:"ちゅうこく",e:"advice; warning"},
+  {w:"助言",h:"じょげん",e:"advice"},
+  {w:"指摘",h:"してき",e:"pointing out"},
+  {w:"提案",h:"ていあん",e:"proposal"},
+  {w:"提供",h:"ていきょう",e:"offering; providing"},
+  {w:"配布",h:"はいふ",e:"distribution"},
+  {w:"流通",h:"りゅうつう",e:"circulation"},
+  {w:"伝達",h:"でんたつ",e:"transmission"},
+  {w:"通知",h:"つうち",e:"notification"},
+  {w:"交渉",h:"こうしょう",e:"negotiation"},
+  {w:"妥協",h:"だきょう",e:"compromise"},
+  {w:"合意",h:"ごうい",e:"agreement"},
+  {w:"契約",h:"けいやく",e:"contract"},
+  {w:"解除",h:"かいじょ",e:"cancellation; release"},
+  {w:"解消",h:"かいしょう",e:"cancellation; dissolution"},
+  {w:"撤回",h:"てっかい",e:"withdrawal; retraction"},
+  {w:"撤退",h:"てったい",e:"withdrawal; retreat"},
+  {w:"廃止",h:"はいし",e:"abolition"},
+  {w:"破壊",h:"はかい",e:"destruction"},
+  {w:"破滅",h:"はめつ",e:"ruin; downfall"},
+  {w:"絶滅",h:"ぜつめつ",e:"extinction"},
+  {w:"絶望",h:"ぜつぼう",e:"despair"},
+  {w:"希望",h:"きぼう",e:"hope"},
+  {w:"願望",h:"がんぼう",e:"wish; desire"},
+  {w:"欲望",h:"よくぼう",e:"desire"},
+  {w:"野心",h:"やしん",e:"ambition"},
+  {w:"使命",h:"しめい",e:"mission"},
+  {w:"任務",h:"にんむ",e:"duty; mission"},
+  {w:"業務",h:"ぎょうむ",e:"business; work"},
+  {w:"権限",h:"けんげん",e:"authority"},
+  {w:"権威",h:"けんい",e:"authority; prestige"},
+  {w:"威厳",h:"いげん",e:"dignity"},
+  {w:"尊厳",h:"そんげん",e:"dignity"},
+  {w:"誇り",h:"ほこり",e:"pride"},
+  {w:"屈辱",h:"くつじょく",e:"humiliation"},
+  {w:"侮辱",h:"ぶじょく",e:"insult"},
+  {w:"尊敬",h:"そんけい",e:"respect"},
+  {w:"敬意",h:"けいい",e:"respect; honor"},
+  {w:"信頼",h:"しんらい",e:"trust"},
+  {w:"信用",h:"しんよう",e:"credibility"},
+  {w:"信仰",h:"しんこう",e:"faith"},
+  {w:"信念",h:"しんねん",e:"belief; conviction"},
+  {w:"確信",h:"かくしん",e:"conviction; certainty"},
+  {w:"疑問",h:"ぎもん",e:"question; doubt"},
+  {w:"懐疑",h:"かいぎ",e:"skepticism"},
+  {w:"否定",h:"ひてい",e:"denial"},
+  {w:"肯定",h:"こうてい",e:"affirmation"},
+  {w:"同意",h:"どうい",e:"consent; agreement"},
+  {w:"反対",h:"はんたい",e:"opposition"},
+  {w:"賛成",h:"さんせい",e:"approval"},
+  {w:"異議",h:"いぎ",e:"objection"},
+  {w:"抗議",h:"こうぎ",e:"protest"},
+  {w:"抵抗",h:"ていこう",e:"resistance"},
+  {w:"反乱",h:"はんらん",e:"rebellion"},
+  {w:"暴力",h:"ぼうりょく",e:"violence"},
+  {w:"圧力",h:"あつりょく",e:"pressure"},
+  {w:"支配",h:"しはい",e:"control; rule"},
+  {w:"統制",h:"とうせい",e:"control; regulation"},
+  {w:"規制",h:"きせい",e:"regulation"},
+  {w:"秩序",h:"ちつじょ",e:"order"},
+  {w:"混乱",h:"こんらん",e:"confusion; chaos"},
+  {w:"衝突",h:"しょうとつ",e:"collision; conflict"},
+  {w:"矛盾",h:"むじゅん",e:"contradiction"},
+  {w:"対立",h:"たいりつ",e:"confrontation"},
+  {w:"葛藤",h:"かっとう",e:"conflict; struggle"},
+  {w:"和解",h:"わかい",e:"reconciliation"},
+  {w:"調和",h:"ちょうわ",e:"harmony"},
+  {w:"均衡",h:"きんこう",e:"balance; equilibrium"},
+  {w:"安定",h:"あんてい",e:"stability"},
+  {w:"不安",h:"ふあん",e:"anxiety"},
+  {w:"恐怖",h:"きょうふ",e:"fear; terror"},
+  {w:"脅威",h:"きょうい",e:"threat"},
+  {w:"危機",h:"きき",e:"crisis"},
+  {w:"困難",h:"こんなん",e:"difficulty"},
+  {w:"貧困",h:"ひんこん",e:"poverty"},
+  {w:"裕福",h:"ゆうふく",e:"wealthy"}
+);
+
+// Runtime dedupe for WORDS_DATA — keep first occurrence per word
+window.addEventListener('load', () => {
+  const seen = new Set();
+  const cleaned = [];
+  for (const e of WORDS_DATA) {
+    if (!seen.has(e.w)) { seen.add(e.w); cleaned.push(e); }
+  }
+  WORDS_DATA.length = 0;
+  WORDS_DATA.push(...cleaned);
+  console.log('Words loaded:', WORDS_DATA.length);
+});
+
+</script>
+
+</body>
+</html>
 
 </body>
 </html>
