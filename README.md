@@ -6,7 +6,17 @@ A small library of browser games for drilling JLPT-level Japanese. No build step
 
 Live at **https://kanji-knight.vercel.app/** (the deployed URL is still the old project name; the game library opens there), or open `index.html` locally — double-click works.
 
-## The games
+## The games & lessons
+
+### 💬 Lessons — `lesson-1.html` (prototype)
+
+A scripted, two-sided conversation that teaches phrases *in context* — no English-first vocab cards. You meet Akari at a language-exchange café and the lesson plays out as a real intro chat.
+
+- **Per-phrase learning loop:** **repeat** (click each word in order to "say" it) → **hover** (tap words to peek at meanings) → **rebuild** (reconstruct the phrase from a shuffled tile bank).
+- **Romaji only** for now — later lessons will introduce hiragana once the kana have been covered.
+- **Politeness baked in:** the conversation deliberately avoids `anata` for "you" — once you learn Akari's name, you ask back with `Akari-san wa?` instead. Particle tooltips explain *why* (`wa` is a topic marker, `o` is the direct-object marker, etc.) rather than handing out dictionary translations.
+- **Branching:** the "what are you doing here?" turn lets you pick between *working / studying / living here* and rebuild whichever fits you.
+- **Personalised:** the start screen asks for your name and country in romaji; both are substituted into Akari's lines and your replies.
 
 ### 🗡️ Kanji Knight — `kanji-knight.html`
 
@@ -29,15 +39,16 @@ Top-down-ish tower defense. A tower at the right edge of the arena fires arrows 
 ## Project layout
 
 ```
-index.html         Library landing page (game card grid)
+index.html         Library landing page (game/lesson card grid)
 kanji-knight.html  Kanji Knight (T-Rex chase, words quiz)
 tower-rush.html    Tower Rush (tower defense, words quiz)
-words-data.js      Shared ~500-entry JLPT words dataset (active)
-kanji-data.js      Shared ~2,000-entry single-kanji dataset (reference; not loaded by either game)
+lesson-1.html      Lesson 1: Meeting Someone New (intro conversation)
+words-data.js      Shared ~500-entry JLPT words dataset (active, both games)
+kanji-data.js      Shared ~2,000-entry single-kanji dataset (reference; not loaded)
 README.md
 ```
 
-Both games `<script src="words-data.js">` the shared words file — single source of truth, fix a reading once and both games benefit. `kanji-data.js` is kept as a reference dataset (and as a fallback if you ever want to swap a game back to single-kanji drills). To add a new game, drop in another `.html` file, load the data file(s) you need, and link it from `index.html`.
+Both games `<script src="words-data.js">` the shared words file — single source of truth, fix a reading once and both games benefit. `lesson-1.html` is self-contained (its scripted conversation is small and bespoke; no external data file needed). `kanji-data.js` is kept as a reference dataset and as a fallback if you ever want to swap a game back to single-kanji drills. To add a new game or lesson, drop in another `.html` file, load the data file(s) you need, and link it from `index.html`.
 
 ## Datasets
 

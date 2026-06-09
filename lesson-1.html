@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 1 — Meeting Someone New</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #e8ecf3; }
+  body { background: linear-gradient(180deg, #1a2a52 0%, #4a3070 60%, #6b3a4a 100%); }
+
+  #topbar {
+    height: 48px; display: flex; align-items: center;
+    padding: 0 20px; gap: 18px;
+    background: rgba(15, 20, 34, 0.7);
+    border-bottom: 1px solid #243057;
+    position: relative; z-index: 12;
+  }
+  #topbar a.back {
+    color: #ffd866; text-decoration: none; font-size: 14px;
+    font-weight: 700; padding: 4px 10px; border-radius: 6px;
+    transition: background 0.15s ease;
+  }
+  #topbar a.back:hover { background: rgba(255, 216, 102, 0.12); }
+  #topbar .title { color: #ffd866; font-weight: 700; letter-spacing: 0.5px; }
+  #topbar .spacer { flex: 1; }
+  #topbar .progress {
+    background: rgba(36, 48, 87, 0.85); border: 1px solid #344371;
+    padding: 5px 12px; border-radius: 999px;
+    font-size: 13px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  #topbar .progress .label { color: #8c97b5; margin-right: 6px; }
+  #topbar .progress .value { color: #ffd866; }
+
+  /* Layout: chat history (scrolling) + current turn (sticky bottom) */
+  #stage {
+    display: flex; flex-direction: column;
+    height: calc(100vh - 48px);
+  }
+  #chat {
+    flex: 1; min-height: 0;
+    overflow-y: auto;
+    padding: 24px 32px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  /* Scroll bar styling */
+  #chat::-webkit-scrollbar { width: 8px; }
+  #chat::-webkit-scrollbar-track { background: transparent; }
+  #chat::-webkit-scrollbar-thumb { background: rgba(255,216,102,0.25); border-radius: 4px; }
+
+  /* Chat bubble rows */
+  .bubble-row {
+    display: flex; gap: 10px; max-width: 720px;
+  }
+  .bubble-row.ai { align-self: flex-start; }
+  .bubble-row.user { align-self: flex-end; flex-direction: row-reverse; }
+  .portrait {
+    width: 44px; height: 44px; border-radius: 50%;
+    flex-shrink: 0; background: #243057;
+    border: 2px solid #ffd866;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; font-size: 24px;
+  }
+  .portrait svg { width: 100%; height: 100%; }
+  .bubble {
+    background: #f6f1e0; color: #1a1a2e;
+    padding: 10px 14px; border-radius: 14px;
+    font-size: 16px; line-height: 1.5; font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    max-width: 600px;
+    word-wrap: break-word;
+  }
+  .bubble-row.ai .bubble { background: #efe6f6; border-bottom-left-radius: 4px; }
+  .bubble-row.user .bubble { background: #e0eaff; border-bottom-right-radius: 4px; }
+  .bubble .name {
+    display: block; font-size: 11px; font-weight: 700;
+    color: #6a4a8a; margin-bottom: 2px; letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .bubble-row.user .bubble .name { color: #2a4a8a; }
+
+  /* Words inside a bubble (in history they're not interactive but the styling is consistent) */
+  .word {
+    display: inline-block; padding: 2px 4px; border-radius: 4px;
+    transition: background 0.15s ease;
+  }
+
+  /* Active turn panel (sticky bottom) */
+  #panel {
+    background: linear-gradient(180deg, #1a2238 0%, #0f1422 100%);
+    border-top: 2px solid #344371;
+    padding: 18px 28px 22px;
+    flex-shrink: 0;
+    max-height: 50vh; overflow-y: auto;
+  }
+  #panel .stage-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 12px;
+  }
+  #panel .stage-header .who {
+    font-size: 12px; color: #8c97b5; text-transform: uppercase; letter-spacing: 0.5px;
+    font-weight: 700;
+  }
+  #panel .stage-header .who strong { color: #ffd866; }
+  #panel .stage-instr {
+    font-size: 13px; color: #c8d0e0; margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  #panel .stage-instr.hint {
+    background: rgba(36, 48, 87, 0.6);
+    padding: 10px 14px; border-radius: 8px;
+    border-left: 3px solid #ffd866;
+  }
+
+  /* Active phrase display (for repeat phase) */
+  #phrase-display {
+    background: #f6f1e0; color: #1a1a2e;
+    padding: 16px 18px; border-radius: 12px;
+    font-size: 22px; line-height: 1.5; font-weight: 700;
+    margin-bottom: 14px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    text-align: center;
+  }
+  #phrase-display .word {
+    cursor: pointer; padding: 4px 6px; margin: 0 2px;
+    border-radius: 6px;
+    color: rgba(26, 26, 46, 0.32);
+    transition: color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+    position: relative;
+  }
+  #phrase-display .word.spoken {
+    color: #1a1a2e;
+    background: rgba(255, 216, 102, 0.55);
+  }
+  #phrase-display .word.next-up {
+    background: rgba(255, 216, 102, 0.15);
+    color: rgba(26, 26, 46, 0.6);
+    box-shadow: 0 0 0 2px rgba(255,216,102,0.5) inset;
+  }
+  #phrase-display .word.shake {
+    animation: word-shake 0.3s ease;
+  }
+  @keyframes word-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+
+  /* Slot row (for rebuild phase) */
+  #slot-row {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    background: #f6f1e0;
+    padding: 16px 18px; border-radius: 12px;
+    margin-bottom: 14px;
+    min-height: 64px; align-items: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    border: 2px dashed rgba(0,0,0,0);
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+  #slot-row.empty { background: rgba(246, 241, 224, 0.15); border-color: rgba(255,216,102,0.4); }
+  #slot-row.empty::before {
+    content: 'Tap word tiles below to fill this in →';
+    color: #8c97b5; font-size: 13px; font-style: italic;
+    width: 100%; text-align: center;
+  }
+  #slot-row .word {
+    background: rgba(255, 216, 102, 0.85);
+    color: #1a1a2e; padding: 6px 10px; border-radius: 6px;
+    font-size: 18px; font-weight: 700; cursor: pointer;
+    transition: transform 0.12s ease;
+  }
+  #slot-row .word:hover { transform: translateY(-2px); }
+  #slot-row.correct {
+    background: #d4f5d4;
+    border: 2px solid #2ecc71;
+    animation: pulse-correct 0.5s ease;
+  }
+  @keyframes pulse-correct {
+    0%, 100% { box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
+    50% { box-shadow: 0 4px 14px rgba(46,204,113,0.5), 0 0 24px rgba(46,204,113,0.4); }
+  }
+
+  /* Word bank */
+  #bank {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-bottom: 14px; min-height: 48px;
+    justify-content: center;
+  }
+  .tile {
+    background: rgba(255, 216, 102, 0.92);
+    color: #1a1a2e;
+    padding: 10px 16px;
+    border: 2px solid #ffd866;
+    border-radius: 8px;
+    font-size: 17px; font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    position: relative;
+  }
+  .tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.45); }
+  .tile:active { transform: translateY(0); }
+  .tile.shake { animation: tile-shake 0.3s ease; background: #ff8a7a; }
+  @keyframes tile-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+  .tile.used { opacity: 0.2; pointer-events: none; }
+
+  /* Branching options */
+  #branch-row {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    justify-content: center; margin-bottom: 14px;
+  }
+  .branch-btn {
+    background: rgba(36, 48, 87, 0.85);
+    color: #e8ecf3;
+    border: 2px solid #344371;
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 14px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+    transition: border-color 0.15s ease, transform 0.12s ease;
+  }
+  .branch-btn:hover { border-color: #ffd866; transform: translateY(-2px); }
+
+  /* Tooltip */
+  .tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%; transform: translateX(-50%);
+    background: #ffd866; color: #0f1422;
+    padding: 8px 12px; border-radius: 8px;
+    font-size: 13px; font-weight: 600;
+    white-space: normal; max-width: 260px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+    z-index: 50;
+    pointer-events: none;
+    text-align: center;
+    animation: tip-in 0.15s ease;
+  }
+  .tooltip::after {
+    content: '';
+    position: absolute; top: 100%; left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #ffd866;
+  }
+  @keyframes tip-in {
+    from { opacity: 0; transform: translate(-50%, 4px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+  }
+
+  /* Stage actions */
+  #actions {
+    display: flex; justify-content: center; gap: 10px;
+  }
+  .action-btn {
+    background: #ffd866; color: #0f1422;
+    border: none; border-radius: 8px;
+    padding: 11px 28px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  .action-btn:hover { background: #ffe28b; transform: translateY(-2px); }
+  .action-btn.secondary {
+    background: #243057; color: #e8ecf3;
+    border: 1px solid #344371;
+  }
+  .action-btn.secondary:hover { background: #2e3c6e; }
+  .action-btn:disabled {
+    background: #555a6e; color: #8c97b5;
+    cursor: not-allowed; transform: none; box-shadow: none;
+  }
+
+  /* Overlays */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(8, 12, 24, 0.92);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 100; padding: 32px;
+    overflow-y: auto;
+  }
+  .overlay.hidden { display: none; }
+  .overlay h1 {
+    font-size: 44px; color: #ffd866; margin: 0 0 12px;
+    text-shadow: 0 4px 18px rgba(0,0,0,0.6); letter-spacing: 1px;
+    text-align: center;
+  }
+  .overlay p {
+    font-size: 16px; margin: 0 0 22px; color: #c8d0e0; max-width: 540px; text-align: center;
+    line-height: 1.5;
+  }
+  .overlay .small-label {
+    font-size: 11px; color: #8c97b5; letter-spacing: 1.5px;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  .overlay .field { width: 100%; max-width: 340px; margin-bottom: 14px; }
+  .overlay input[type=text], .overlay select {
+    width: 100%;
+    padding: 11px 14px;
+    background: #1a2238; border: 2px solid #344371;
+    border-radius: 8px;
+    color: #e8ecf3; font-size: 16px; font-family: inherit;
+  }
+  .overlay input[type=text]:focus, .overlay select:focus {
+    outline: none; border-color: #ffd866;
+  }
+
+  /* Recap on complete */
+  #recap {
+    background: rgba(36, 48, 87, 0.6);
+    border-radius: 12px;
+    padding: 18px 22px;
+    max-width: 620px;
+    margin-bottom: 24px;
+    width: 100%;
+  }
+  #recap h3 {
+    font-size: 13px; color: #ffd866; margin: 0 0 12px;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  #recap ol {
+    padding-left: 20px; color: #e8ecf3;
+    font-size: 14px; line-height: 1.7;
+    margin: 0;
+  }
+  #recap ol li { padding: 2px 0; }
+  #recap ol li b { color: #ffd866; }
+
+  /* Akari portrait SVG embedded */
+  .portrait-akari { background: #fce0c8; }
+  .portrait-user {
+    background: linear-gradient(135deg, #5a8aff, #3a5ab8);
+    color: #fff; font-weight: 800;
+  }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <a class="back" href="index.html">← Library</a>
+  <span class="title">Lesson 1 · Meeting Someone New</span>
+  <span class="spacer"></span>
+  <span class="progress"><span class="label">Turn</span><span class="value" id="progress-value">1 / 13</span></span>
+</div>
+
+<div id="stage">
+  <!-- Chat history -->
+  <div id="chat"></div>
+
+  <!-- Active turn panel -->
+  <div id="panel">
+    <div class="stage-header">
+      <div class="who" id="stage-who"><strong>Akari</strong> says…</div>
+    </div>
+    <div class="stage-instr" id="stage-instr">Tap each word in order to repeat it.</div>
+
+    <!-- Phrase display (repeat + hover phases) -->
+    <div id="phrase-display"></div>
+
+    <!-- Slot row (rebuild phase) -->
+    <div id="slot-row" class="hidden"></div>
+
+    <!-- Word bank (rebuild phase) -->
+    <div id="bank" class="hidden"></div>
+
+    <!-- Branching options (turn 12) -->
+    <div id="branch-row" class="hidden"></div>
+
+    <!-- Actions -->
+    <div id="actions"></div>
+  </div>
+</div>
+
+<!-- Start overlay -->
+<div class="overlay" id="start-overlay">
+  <h1>Lesson 1: Meeting Someone New</h1>
+  <p>You're at a language-exchange café in Tokyo. Akari is about to come over and say hi. Learn to greet her, introduce yourself, and tell her a bit about you — all in natural, polite Japanese.</p>
+  <div class="field">
+    <div class="small-label">Your name (Akari will call you this)</div>
+    <input type="text" id="name-input" value="Alex" maxlength="20">
+  </div>
+  <div class="field">
+    <div class="small-label">Your country (in romaji)</div>
+    <input type="text" id="country-input" value="Amerika" maxlength="30">
+  </div>
+  <button class="action-btn" id="start-btn">Begin Lesson</button>
+</div>
+
+<!-- Complete overlay -->
+<div class="overlay hidden" id="complete-overlay">
+  <h1>よくできました! Well done!</h1>
+  <p>You just had a real introduction conversation in polite Japanese — and you did it without ever using <i>anata</i>. Here are the phrases you used:</p>
+  <div id="recap"><h3>Phrases learned</h3><ol id="recap-list"></ol></div>
+  <a href="index.html" class="action-btn" style="text-decoration: none;">← Back to Library</a>
+</div>
+
+<script>
+/* ============================================================
+   LESSON DATA
+   Each word: { w: token (as written), m: meaning shown on hover }
+   `instr` is the romaji repeat-and-rebuild instruction shown for
+   Akari turns; `hint` is the English intent shown for user turns.
+   ============================================================ */
+const LESSON = {
+  characterName: 'Akari',
+  turns: [
+    // 1
+    { speaker: 'ai',
+      words: [{ w: 'Konnichiwa!', m: 'hello / good day' }] },
+    // 2
+    { speaker: 'user',
+      hint: 'Say hi back.',
+      words: [{ w: 'Konnichiwa!', m: 'hello / good day' }] },
+    // 3 — Akari introduces herself
+    { speaker: 'ai',
+      words: [
+        { w: 'Hajimemashite.', m: 'nice to meet you' },
+        { w: 'Watashi', m: 'I / me' },
+        { w: 'no', m: '(possessive — like "of" or "\'s")' },
+        { w: 'namae', m: 'name' },
+        { w: 'wa', m: '(topic marker — "as for…")' },
+        { w: 'Akari', m: 'her name (Akari)' },
+        { w: 'desu.', m: 'is / am / are (polite)' },
+      ] },
+    // 4 — User introduces themselves
+    { speaker: 'user',
+      hint: 'Introduce yourself the same way Akari did. Tell her your name.',
+      words: [
+        { w: 'Hajimemashite.', m: 'nice to meet you' },
+        { w: 'Watashi', m: 'I / me' },
+        { w: 'no', m: '(possessive — like "of" or "\'s")' },
+        { w: 'namae', m: 'name' },
+        { w: 'wa', m: '(topic marker — "as for…")' },
+        { w: '{NAME}', m: 'your name' },
+        { w: 'desu.', m: 'is / am / are (polite)' },
+      ] },
+    // 5 — Akari asks how you are
+    { speaker: 'ai',
+      words: [
+        { w: '{NAME}-san,', m: 'your name + -san (polite honorific, like Mr./Ms.) — Akari is addressing you' },
+        { w: 'genki', m: 'fine / well / energetic' },
+        { w: 'desu', m: 'is / am / are (polite)' },
+        { w: 'ka?', m: '(turns the sentence into a question)' },
+      ] },
+    // 6 — User answers + asks back using her name (the politeness moment)
+    { speaker: 'user',
+      hint: 'Say you\'re good, then ask her back — but use her name, not "you". In Japanese, saying "anata" to someone you just met sounds blunt.',
+      words: [
+        { w: 'Genki', m: 'fine / well / energetic' },
+        { w: 'desu.', m: 'is / am / are' },
+        { w: 'Akari-san', m: 'her name + -san — use the person\'s name instead of "anata" when addressing them' },
+        { w: 'wa?', m: '(topic marker — used alone here means "how about you?")' },
+      ] },
+    // 7 — Akari: I'm good too! (short connector)
+    { speaker: 'ai',
+      words: [
+        { w: 'Watashi', m: 'I / me' },
+        { w: 'mo', m: 'also / too' },
+        { w: 'genki', m: 'fine / well' },
+        { w: 'desu!', m: 'is / am / are' },
+      ] },
+    // 8 — Akari asks where you're from
+    { speaker: 'ai',
+      words: [
+        { w: '{NAME}-san,', m: 'your name + -san — Akari is addressing you politely' },
+        { w: 'doko', m: 'where' },
+        { w: 'kara', m: '(from)' },
+        { w: 'kimashita', m: 'came (past tense of "to come")' },
+        { w: 'ka?', m: '(question marker)' },
+      ] },
+    // 9 — User answers
+    { speaker: 'user',
+      hint: 'Tell her where you came from.',
+      words: [
+        { w: '{COUNTRY}', m: 'your country' },
+        { w: 'kara', m: '(from)' },
+        { w: 'kimashita.', m: 'came (past tense of "to come")' },
+      ] },
+    // 10 — Akari: that's a nice place
+    { speaker: 'ai',
+      words: [
+        { w: '{COUNTRY}!', m: 'your country' },
+        { w: 'Sore', m: 'that' },
+        { w: 'wa', m: '(topic marker)' },
+        { w: 'ii', m: 'good / nice' },
+        { w: 'basho', m: 'place' },
+        { w: 'desu', m: 'is' },
+        { w: 'ne!', m: '(seeking agreement — like "isn\'t it?")' },
+      ] },
+    // 11 — Akari: what are you doing here?
+    { speaker: 'ai',
+      words: [
+        { w: 'Koko', m: 'here' },
+        { w: 'de', m: '(at/in — for the place of an action)' },
+        { w: 'nani', m: 'what' },
+        { w: 'o', m: '(direct-object marker)' },
+        { w: 'shiteimasu', m: 'are doing (present continuous)' },
+        { w: 'ka?', m: '(question marker)' },
+      ] },
+    // 12 — User picks one of three
+    { speaker: 'user',
+      branching: true,
+      hint: 'Tell her what you\'re doing here. Pick one:',
+      options: [
+        { label: 'I am working here',
+          words: [
+            { w: 'Koko', m: 'here' },
+            { w: 'de', m: '(at/in — for the place of an action)' },
+            { w: 'hataraiteimasu.', m: 'am working (present continuous of "to work")' },
+          ] },
+        { label: 'I am studying here',
+          words: [
+            { w: 'Koko', m: 'here' },
+            { w: 'de', m: '(at/in — for the place of an action)' },
+            { w: 'benkyou', m: 'study (the noun)' },
+            { w: 'shiteimasu.', m: 'am doing — "benkyou shiteimasu" = "am studying"' },
+          ] },
+        { label: 'I live here',
+          words: [
+            { w: 'Koko', m: 'here' },
+            { w: 'ni', m: '(at/in — for the location of a state, like living)' },
+            { w: 'sundeimasu.', m: 'am living / live (present continuous of "to live")' },
+          ] },
+      ] },
+    // 13 — Akari closes
+    { speaker: 'ai',
+      words: [
+        { w: 'Soudesu', m: 'is that so' },
+        { w: 'ka,', m: '(question marker — used here as a soft "oh, I see")' },
+        { w: 'suteki', m: 'wonderful / lovely' },
+        { w: 'desu', m: 'is' },
+        { w: 'ne!', m: '(seeking agreement)' },
+        { w: 'Mata', m: 'again' },
+        { w: 'ne!', m: '(soft "see you" with "mata" — "see you again!")' },
+      ] },
+  ]
+};
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const state = {
+  phase: 'idle',     // idle | repeat | hover | rebuild | complete | done | branch-pick
+  turnIdx: 0,
+  userName: 'Alex',
+  userCountry: 'Amerika',
+  expectedSeq: [],   // resolved words for the current turn (in order)
+  repeatPos: 0,
+  rebuildPlaced: [],
+  rebuildBank: [],
+  branchPick: null,
+  history: [],       // [{speaker, words}]
+};
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+function substitute(word) {
+  const w = word.w
+    .replace(/\{NAME\}/g, state.userName)
+    .replace(/\{COUNTRY\}/g, state.userCountry);
+  return { w, m: word.m };
+}
+function turnWords(turn) {
+  if (turn.branching) {
+    const opt = turn.options[state.branchPick];
+    return opt.words.map(substitute);
+  }
+  return turn.words.map(substitute);
+}
+function joinedPhrase(words) {
+  return words.map(w => w.w).join(' ');
+}
+
+/* ============================================================
+   PORTRAIT SVG
+   ============================================================ */
+function akariSvg() {
+  return '<svg viewBox="0 0 100 100">' +
+    // Hair back
+    '<path d="M 12 38 Q 50 -2, 88 38 L 88 70 L 12 70 Z" fill="#3a2418"/>' +
+    // Face
+    '<ellipse cx="50" cy="60" rx="28" ry="33" fill="#fce0c8"/>' +
+    // Hair forelock
+    '<path d="M 22 30 Q 36 22, 50 30 Q 64 22, 78 30 L 78 50 Q 62 42, 50 46 Q 38 42, 22 50 Z" fill="#3a2418"/>' +
+    // Eyes
+    '<ellipse cx="40" cy="62" rx="3.5" ry="4" fill="#1a1a2e"/>' +
+    '<ellipse cx="60" cy="62" rx="3.5" ry="4" fill="#1a1a2e"/>' +
+    '<circle cx="41" cy="61" r="1.2" fill="white"/>' +
+    '<circle cx="61" cy="61" r="1.2" fill="white"/>' +
+    // Blush
+    '<ellipse cx="34" cy="72" rx="4" ry="2.5" fill="#ffb0a0" opacity="0.6"/>' +
+    '<ellipse cx="66" cy="72" rx="4" ry="2.5" fill="#ffb0a0" opacity="0.6"/>' +
+    // Smile
+    '<path d="M 42 78 Q 50 84, 58 78" stroke="#a0584a" stroke-width="2" fill="none" stroke-linecap="round"/>' +
+    // Collar
+    '<path d="M 12 100 Q 30 88, 50 88 Q 70 88, 88 100 Z" fill="#5a8aff"/>' +
+    '</svg>';
+}
+
+/* ============================================================
+   CHAT HISTORY
+   ============================================================ */
+function appendHistory(speaker, words) {
+  state.history.push({ speaker, words });
+  const chat = document.getElementById('chat');
+  const row = document.createElement('div');
+  row.className = 'bubble-row ' + speaker;
+  const portrait = document.createElement('div');
+  portrait.className = 'portrait ' + (speaker === 'ai' ? 'portrait-akari' : 'portrait-user');
+  portrait.innerHTML = speaker === 'ai'
+    ? akariSvg()
+    : escapeHtml((state.userName || 'You').charAt(0).toUpperCase());
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  const name = speaker === 'ai' ? 'Akari' : 'You';
+  bubble.innerHTML = '<span class="name">' + escapeHtml(name) + '</span>' +
+    words.map(w => '<span class="word">' + escapeHtml(w.w) + '</span>').join(' ');
+  row.appendChild(portrait);
+  row.appendChild(bubble);
+  chat.appendChild(row);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+/* ============================================================
+   RENDER ACTIVE TURN
+   ============================================================ */
+function renderTurn() {
+  const turn = LESSON.turns[state.turnIdx];
+  if (!turn) { showComplete(); return; }
+
+  // Resolve substitutions
+  state.branchPick = null;
+  state.expectedSeq = turn.branching ? [] : turn.words.map(substitute);
+  state.repeatPos = 0;
+  state.rebuildPlaced = [];
+  state.rebuildBank = [];
+
+  document.getElementById('progress-value').textContent = (state.turnIdx + 1) + ' / ' + LESSON.turns.length;
+  document.getElementById('stage-who').innerHTML =
+    turn.speaker === 'ai'
+      ? '<strong>Akari</strong> says…'
+      : '<strong>You</strong> reply';
+
+  // Reset all stage UI
+  document.getElementById('phrase-display').classList.remove('hidden');
+  document.getElementById('phrase-display').innerHTML = '';
+  document.getElementById('slot-row').classList.add('hidden');
+  document.getElementById('slot-row').innerHTML = '';
+  document.getElementById('bank').classList.add('hidden');
+  document.getElementById('bank').innerHTML = '';
+  document.getElementById('branch-row').classList.add('hidden');
+  document.getElementById('branch-row').innerHTML = '';
+  document.getElementById('actions').innerHTML = '';
+
+  if (turn.speaker === 'ai') {
+    startRepeatPhase();
+  } else if (turn.branching) {
+    startBranchPhase();
+  } else {
+    startUserRebuildPhase();
+  }
+}
+
+/* ============================================================
+   PHASE: REPEAT (AI turns only)
+   ============================================================ */
+function startRepeatPhase() {
+  state.phase = 'repeat';
+  document.getElementById('stage-instr').className = 'stage-instr';
+  document.getElementById('stage-instr').textContent =
+    'Tap each word in order to repeat what Akari said.';
+  renderPhraseDisplay({ interactive: true, dimUntilSpoken: true });
+}
+
+function renderPhraseDisplay(opts) {
+  opts = opts || {};
+  const el = document.getElementById('phrase-display');
+  el.innerHTML = '';
+  state.expectedSeq.forEach((word, i) => {
+    const span = document.createElement('span');
+    span.className = 'word';
+    span.textContent = word.w;
+    span.dataset.idx = i;
+
+    if (opts.dimUntilSpoken) {
+      // Dim until spoken; mark the next-up word
+      if (i < state.repeatPos) span.classList.add('spoken');
+      else if (i === state.repeatPos) span.classList.add('next-up');
+    } else {
+      // Hover phase — all words lit
+      span.classList.add('spoken');
+    }
+
+    if (opts.interactive) {
+      if (opts.dimUntilSpoken) {
+        span.addEventListener('click', () => onWordRepeatClick(i, span));
+      } else {
+        // Hover phase: click/tap to toggle tooltip
+        attachTooltip(span, word.m);
+      }
+    }
+    el.appendChild(span);
+  });
+}
+
+function onWordRepeatClick(idx, span) {
+  if (state.phase !== 'repeat') return;
+  if (idx === state.repeatPos) {
+    state.repeatPos++;
+    span.classList.remove('next-up');
+    span.classList.add('spoken');
+    // Mark next-up
+    const nextSpan = document.querySelector('#phrase-display .word[data-idx="' + state.repeatPos + '"]');
+    if (nextSpan) nextSpan.classList.add('next-up');
+    if (state.repeatPos >= state.expectedSeq.length) {
+      // Move to hover phase
+      setTimeout(startHoverPhase, 250);
+    }
+  } else {
+    span.classList.add('shake');
+    setTimeout(() => span.classList.remove('shake'), 300);
+  }
+}
+
+/* ============================================================
+   PHASE: HOVER (AI turns only)
+   ============================================================ */
+function startHoverPhase() {
+  state.phase = 'hover';
+  document.getElementById('stage-instr').className = 'stage-instr';
+  document.getElementById('stage-instr').textContent =
+    'Now tap any word to see what it means. When you\'re ready, hit Continue.';
+  renderPhraseDisplay({ interactive: true, dimUntilSpoken: false });
+  const actions = document.getElementById('actions');
+  actions.innerHTML = '';
+  const btn = document.createElement('button');
+  btn.className = 'action-btn';
+  btn.textContent = 'Continue → Rebuild';
+  btn.addEventListener('click', startAiRebuildPhase);
+  actions.appendChild(btn);
+}
+
+/* ============================================================
+   PHASE: REBUILD (both AI turns and user turns)
+   ============================================================ */
+function startAiRebuildPhase() {
+  state.phase = 'rebuild';
+  document.getElementById('stage-instr').className = 'stage-instr';
+  document.getElementById('stage-instr').textContent =
+    'Reconstruct the phrase by tapping the tiles in the correct order. Tap a tile in the slot row to send it back.';
+  document.getElementById('phrase-display').classList.add('hidden');
+  setupRebuildUI();
+}
+
+function startUserRebuildPhase() {
+  state.phase = 'rebuild';
+  const turn = LESSON.turns[state.turnIdx];
+  state.expectedSeq = turn.words.map(substitute);
+  document.getElementById('phrase-display').classList.add('hidden');
+  document.getElementById('stage-instr').className = 'stage-instr hint';
+  document.getElementById('stage-instr').innerHTML =
+    '<b>Reply:</b> ' + escapeHtml(turn.hint) +
+    '<br><span style="font-size:12px;color:#8c97b5">Tap tiles to build your reply. Tap a tile to see what it means.</span>';
+  setupRebuildUI();
+}
+
+function setupRebuildUI() {
+  // Initialize bank with shuffled indices
+  state.rebuildPlaced = [];
+  state.rebuildBank = shuffle(state.expectedSeq.map((_, i) => i));
+
+  const slot = document.getElementById('slot-row');
+  const bank = document.getElementById('bank');
+  slot.classList.remove('hidden');
+  bank.classList.remove('hidden');
+  slot.classList.remove('correct');
+  renderSlotRow();
+  renderBank();
+  document.getElementById('actions').innerHTML = '';
+}
+
+function renderSlotRow() {
+  const slot = document.getElementById('slot-row');
+  slot.innerHTML = '';
+  if (state.rebuildPlaced.length === 0) {
+    slot.classList.add('empty');
+    return;
+  }
+  slot.classList.remove('empty');
+  state.rebuildPlaced.forEach((idx) => {
+    const word = state.expectedSeq[idx];
+    const span = document.createElement('span');
+    span.className = 'word';
+    span.textContent = word.w;
+    span.addEventListener('click', () => onSlotClick(idx));
+    slot.appendChild(span);
+  });
+}
+
+function renderBank() {
+  const bank = document.getElementById('bank');
+  bank.innerHTML = '';
+  state.rebuildBank.forEach((idx) => {
+    const word = state.expectedSeq[idx];
+    const tile = document.createElement('button');
+    tile.className = 'tile';
+    tile.dataset.idx = idx;
+    tile.textContent = word.w;
+    tile.addEventListener('click', (e) => {
+      // If a tooltip is open on this tile, don't also place it.
+      if (tile.dataset.tooltipOpen === '1') return;
+      onBankClick(idx, tile);
+    });
+    attachTooltip(tile, word.m);
+    bank.appendChild(tile);
+  });
+}
+
+function onBankClick(idx, tile) {
+  if (state.phase !== 'rebuild') return;
+  const expectedNext = state.rebuildPlaced.length;
+  if (idx === expectedNext) {
+    // Correct: move tile from bank to slot
+    state.rebuildPlaced.push(idx);
+    state.rebuildBank = state.rebuildBank.filter(x => x !== idx);
+    renderSlotRow();
+    renderBank();
+    if (state.rebuildPlaced.length === state.expectedSeq.length) {
+      onRebuildComplete();
+    }
+  } else {
+    // Wrong: shake
+    tile.classList.add('shake');
+    setTimeout(() => tile.classList.remove('shake'), 320);
+  }
+}
+
+function onSlotClick(idx) {
+  if (state.phase !== 'rebuild') return;
+  // Only allow removing the LAST placed tile (keeps it simple + ordered)
+  if (state.rebuildPlaced[state.rebuildPlaced.length - 1] !== idx) return;
+  state.rebuildPlaced.pop();
+  state.rebuildBank.push(idx);
+  state.rebuildBank = shuffle(state.rebuildBank);
+  renderSlotRow();
+  renderBank();
+}
+
+function onRebuildComplete() {
+  document.getElementById('slot-row').classList.add('correct');
+  const turn = LESSON.turns[state.turnIdx];
+  const speaker = turn.speaker;
+  // Build the words array (post-substitution) for history
+  const words = state.expectedSeq.map(w => ({ w: w.w, m: w.m }));
+  setTimeout(() => {
+    appendHistory(speaker, words);
+    document.getElementById('actions').innerHTML = '';
+    const btn = document.createElement('button');
+    btn.className = 'action-btn';
+    btn.textContent = state.turnIdx >= LESSON.turns.length - 1 ? 'Finish lesson →' : 'Next →';
+    btn.addEventListener('click', advance);
+    document.getElementById('actions').appendChild(btn);
+  }, 450);
+}
+
+function advance() {
+  state.turnIdx++;
+  if (state.turnIdx >= LESSON.turns.length) {
+    showComplete();
+    return;
+  }
+  renderTurn();
+}
+
+/* ============================================================
+   PHASE: BRANCH PICK (turn 12)
+   ============================================================ */
+function startBranchPhase() {
+  state.phase = 'branch-pick';
+  const turn = LESSON.turns[state.turnIdx];
+  document.getElementById('stage-instr').className = 'stage-instr hint';
+  document.getElementById('stage-instr').innerHTML =
+    '<b>Your turn:</b> ' + escapeHtml(turn.hint);
+  document.getElementById('phrase-display').classList.add('hidden');
+  const row = document.getElementById('branch-row');
+  row.classList.remove('hidden');
+  row.innerHTML = '';
+  turn.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'branch-btn';
+    btn.textContent = opt.label;
+    btn.addEventListener('click', () => {
+      state.branchPick = i;
+      state.expectedSeq = opt.words.map(substitute);
+      row.classList.add('hidden');
+      // Show the rebuild UI for this option
+      document.getElementById('stage-instr').className = 'stage-instr hint';
+      document.getElementById('stage-instr').innerHTML =
+        '<b>Now build it:</b> ' + escapeHtml(opt.label) +
+        '<br><span style="font-size:12px;color:#8c97b5">Tap tiles to build your reply.</span>';
+      setupRebuildUI();
+    });
+    row.appendChild(btn);
+  });
+}
+
+/* ============================================================
+   TOOLTIPS (hover on desktop, tap-to-toggle on touch)
+   ============================================================ */
+function attachTooltip(el, meaning) {
+  if (!meaning) return;
+  let tooltipEl = null;
+  let showTimer = null;
+
+  function show() {
+    if (tooltipEl) return;
+    tooltipEl = document.createElement('div');
+    tooltipEl.className = 'tooltip';
+    tooltipEl.textContent = meaning;
+    el.style.position = el.style.position || 'relative';
+    el.appendChild(tooltipEl);
+    el.dataset.tooltipOpen = '1';
+  }
+  function hide() {
+    if (tooltipEl) { tooltipEl.remove(); tooltipEl = null; }
+    delete el.dataset.tooltipOpen;
+  }
+
+  el.addEventListener('mouseenter', () => {
+    clearTimeout(showTimer);
+    showTimer = setTimeout(show, 100);
+  });
+  el.addEventListener('mouseleave', () => {
+    clearTimeout(showTimer);
+    hide();
+  });
+  // Tap-to-toggle for touch / explicit clicks (when the click is also a "place tile"
+  // action, the bank handler checks dataset.tooltipOpen and short-circuits.)
+  el.addEventListener('click', (e) => {
+    if (tooltipEl) {
+      hide();
+    } else {
+      show();
+      // Auto-hide after 2.5s on tap
+      setTimeout(() => { if (tooltipEl) hide(); }, 2500);
+    }
+  });
+}
+
+/* ============================================================
+   COMPLETE OVERLAY
+   ============================================================ */
+function showComplete() {
+  state.phase = 'done';
+  const list = document.getElementById('recap-list');
+  list.innerHTML = '';
+  state.history.forEach((entry, i) => {
+    const li = document.createElement('li');
+    const speaker = entry.speaker === 'ai' ? 'Akari' : 'You';
+    const text = entry.words.map(w => w.w).join(' ');
+    li.innerHTML = '<b>' + speaker + ':</b> ' + escapeHtml(text);
+    list.appendChild(li);
+  });
+  document.getElementById('complete-overlay').classList.remove('hidden');
+}
+
+/* ============================================================
+   START
+   ============================================================ */
+document.getElementById('start-btn').addEventListener('click', () => {
+  const nameRaw = document.getElementById('name-input').value.trim();
+  const countryRaw = document.getElementById('country-input').value.trim();
+  state.userName = nameRaw || 'Alex';
+  state.userCountry = countryRaw || 'Amerika';
+  document.getElementById('start-overlay').classList.add('hidden');
+  state.turnIdx = 0;
+  state.history = [];
+  document.getElementById('chat').innerHTML = '';
+  renderTurn();
+});
+</script>
+
+</body>
+</html>
