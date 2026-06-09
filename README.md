@@ -10,13 +10,14 @@ Live at **https://kanji-knight.vercel.app/** (the deployed URL is still the old 
 
 ### 💬 Lessons — `lesson-1.html` (prototype)
 
-A scripted, two-sided conversation that teaches phrases *in context* — no English-first vocab cards. You meet Akari at a language-exchange café and the lesson plays out as a real intro chat.
+A scripted, two-sided conversation that teaches phrases *in context* — no English-first vocab cards. You sit across the table from Hikari at a Japanese café, and the lesson plays out as a real intro chat.
 
-- **Per-phrase learning loop:** **repeat** (click each word in order to "say" it) → **hover** (tap words to peek at meanings) → **rebuild** (reconstruct the phrase from a shuffled tile bank).
+- **Visual-novel café scene:** full-viewport SVG background (warm afternoon café, window with sky, paper lantern, wainscoting) with Hikari drawn behind the table. Dialogue happens in a VN-style box anchored at the bottom of the screen — no scrolling chat history during play (the recap waits for the end).
+- **Per-phrase learning loop:** on Hikari's turns she speaks her phrase — hover or tap any word for its meaning, then **Continue**. On your turns, build your reply from a shuffled word-tile bank into the slot row.
 - **Romaji only** for now — later lessons will introduce hiragana once the kana have been covered.
-- **Politeness baked in:** the conversation deliberately avoids `anata` for "you" — once you learn Akari's name, you ask back with `Akari-san wa?` instead. Particle tooltips explain *why* (`wa` is a topic marker, `o` is the direct-object marker, etc.) rather than handing out dictionary translations.
+- **Politeness baked in:** the conversation deliberately avoids `anata` for "you" — once you learn Hikari's name, you ask back with `Hikari-san wa?` instead. Particle tooltips explain *why* (`wa` is a topic marker, `o` is the direct-object marker, etc.) rather than handing out dictionary translations.
 - **Branching:** the "what are you doing here?" turn lets you pick between *working / studying / living here* and rebuild whichever fits you.
-- **Personalised:** the start screen asks for your name and country in romaji; both are substituted into Akari's lines and your replies.
+- **Personalised:** the start screen asks for your name and country in romaji; both are substituted into Hikari's lines and your replies.
 
 ### 🗡️ Kanji Knight — `kanji-knight.html`
 

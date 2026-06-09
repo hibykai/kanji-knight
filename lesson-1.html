@@ -3,246 +3,252 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 1 — Meeting Someone New</title>
+<title>Lesson 1 — Meeting Hikari at the Café</title>
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; overflow: hidden;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    color: #e8ecf3; }
-  body { background: linear-gradient(180deg, #1a2a52 0%, #4a3070 60%, #6b3a4a 100%); }
+    color: #1a1a2e; }
+  body {
+    background: #1a1a2e;
+    position: relative;
+  }
 
+  /* Café scene (full viewport background) */
+  #scene {
+    position: fixed; inset: 0; z-index: 0;
+    overflow: hidden;
+  }
+  #scene svg {
+    width: 100%; height: 100%;
+    display: block;
+  }
+  /* Slight darken at the bottom so the dialogue box always contrasts */
+  #scene::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(20,12,32,0.35) 0%, rgba(20,12,32,0.1) 30%, transparent 50%);
+    pointer-events: none;
+  }
+
+  /* Top bar (minimal, semi-transparent over scene) */
   #topbar {
-    height: 48px; display: flex; align-items: center;
-    padding: 0 20px; gap: 18px;
-    background: rgba(15, 20, 34, 0.7);
-    border-bottom: 1px solid #243057;
-    position: relative; z-index: 12;
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 44px; display: flex; align-items: center;
+    padding: 0 18px; gap: 16px;
+    background: rgba(15, 20, 34, 0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(255, 216, 102, 0.25);
+    z-index: 20;
+    color: #e8ecf3;
   }
   #topbar a.back {
-    color: #ffd866; text-decoration: none; font-size: 14px;
+    color: #ffd866; text-decoration: none; font-size: 13px;
     font-weight: 700; padding: 4px 10px; border-radius: 6px;
     transition: background 0.15s ease;
   }
-  #topbar a.back:hover { background: rgba(255, 216, 102, 0.12); }
-  #topbar .title { color: #ffd866; font-weight: 700; letter-spacing: 0.5px; }
+  #topbar a.back:hover { background: rgba(255, 216, 102, 0.15); }
+  #topbar .title { color: #ffd866; font-weight: 700; letter-spacing: 0.5px; font-size: 14px; }
   #topbar .spacer { flex: 1; }
   #topbar .progress {
-    background: rgba(36, 48, 87, 0.85); border: 1px solid #344371;
-    padding: 5px 12px; border-radius: 999px;
-    font-size: 13px; font-weight: 700;
+    background: rgba(36, 48, 87, 0.7); border: 1px solid rgba(255, 216, 102, 0.35);
+    padding: 4px 12px; border-radius: 999px;
+    font-size: 12px; font-weight: 700;
     font-variant-numeric: tabular-nums;
   }
-  #topbar .progress .label { color: #8c97b5; margin-right: 6px; }
+  #topbar .progress .label { color: #b8a880; margin-right: 6px; }
   #topbar .progress .value { color: #ffd866; }
 
-  /* Layout: chat history (scrolling) + current turn (sticky bottom) */
-  #stage {
-    display: flex; flex-direction: column;
-    height: calc(100vh - 48px);
-  }
-  #chat {
-    flex: 1; min-height: 0;
+  /* Dialogue panel (visual-novel-style box anchored to bottom) */
+  #dialogue {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(180deg, #fdf6e3 0%, #f6ead0 100%);
+    border-top: 3px solid #ffd866;
+    box-shadow: 0 -10px 32px rgba(0, 0, 0, 0.45);
+    z-index: 10;
+    padding: 22px 32px 24px;
+    min-height: 30vh;
+    max-height: 55vh;
     overflow-y: auto;
-    padding: 24px 32px;
-    display: flex; flex-direction: column; gap: 14px;
+    color: #1a1a2e;
   }
-  /* Scroll bar styling */
-  #chat::-webkit-scrollbar { width: 8px; }
-  #chat::-webkit-scrollbar-track { background: transparent; }
-  #chat::-webkit-scrollbar-thumb { background: rgba(255,216,102,0.25); border-radius: 4px; }
-
-  /* Chat bubble rows */
-  .bubble-row {
-    display: flex; gap: 10px; max-width: 720px;
-  }
-  .bubble-row.ai { align-self: flex-start; }
-  .bubble-row.user { align-self: flex-end; flex-direction: row-reverse; }
-  .portrait {
-    width: 44px; height: 44px; border-radius: 50%;
-    flex-shrink: 0; background: #243057;
-    border: 2px solid #ffd866;
-    display: flex; align-items: center; justify-content: center;
-    overflow: hidden; font-size: 24px;
-  }
-  .portrait svg { width: 100%; height: 100%; }
-  .bubble {
-    background: #f6f1e0; color: #1a1a2e;
-    padding: 10px 14px; border-radius: 14px;
-    font-size: 16px; line-height: 1.5; font-weight: 600;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    max-width: 600px;
-    word-wrap: break-word;
-  }
-  .bubble-row.ai .bubble { background: #efe6f6; border-bottom-left-radius: 4px; }
-  .bubble-row.user .bubble { background: #e0eaff; border-bottom-right-radius: 4px; }
-  .bubble .name {
-    display: block; font-size: 11px; font-weight: 700;
-    color: #6a4a8a; margin-bottom: 2px; letter-spacing: 0.5px;
-    text-transform: uppercase;
-  }
-  .bubble-row.user .bubble .name { color: #2a4a8a; }
-
-  /* Words inside a bubble (in history they're not interactive but the styling is consistent) */
-  .word {
-    display: inline-block; padding: 2px 4px; border-radius: 4px;
-    transition: background 0.15s ease;
+  /* Subtle pattern overlay on the parchment */
+  #dialogue::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      repeating-linear-gradient(90deg, transparent 0 24px, rgba(255, 216, 102, 0.03) 24px 25px);
+    pointer-events: none;
   }
 
-  /* Active turn panel (sticky bottom) */
-  #panel {
-    background: linear-gradient(180deg, #1a2238 0%, #0f1422 100%);
-    border-top: 2px solid #344371;
-    padding: 18px 28px 22px;
-    flex-shrink: 0;
-    max-height: 50vh; overflow-y: auto;
-  }
-  #panel .stage-header {
-    display: flex; align-items: center; gap: 10px;
-    margin-bottom: 12px;
-  }
-  #panel .stage-header .who {
-    font-size: 12px; color: #8c97b5; text-transform: uppercase; letter-spacing: 0.5px;
-    font-weight: 700;
-  }
-  #panel .stage-header .who strong { color: #ffd866; }
-  #panel .stage-instr {
-    font-size: 13px; color: #c8d0e0; margin-bottom: 14px;
-    line-height: 1.5;
-  }
-  #panel .stage-instr.hint {
-    background: rgba(36, 48, 87, 0.6);
-    padding: 10px 14px; border-radius: 8px;
-    border-left: 3px solid #ffd866;
-  }
-
-  /* Active phrase display (for repeat phase) */
-  #phrase-display {
-    background: #f6f1e0; color: #1a1a2e;
-    padding: 16px 18px; border-radius: 12px;
-    font-size: 22px; line-height: 1.5; font-weight: 700;
+  #name-plate {
+    display: inline-block;
+    background: #ffd866; color: #0f1422;
+    padding: 5px 18px; border-radius: 999px;
+    font-size: 12px; font-weight: 800;
+    letter-spacing: 2px;
     margin-bottom: 14px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
-    text-align: center;
-  }
-  #phrase-display .word {
-    cursor: pointer; padding: 4px 6px; margin: 0 2px;
-    border-radius: 6px;
-    color: rgba(26, 26, 46, 0.32);
-    transition: color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
     position: relative;
   }
-  #phrase-display .word.spoken {
+
+  /* Dialogue text (the spoken phrase) */
+  #dialogue-text {
+    font-size: 28px;
+    line-height: 1.55;
+    font-weight: 600;
+    margin-bottom: 18px;
     color: #1a1a2e;
+    position: relative;
+  }
+  #dialogue-text .word {
+    display: inline-block;
+    padding: 2px 6px;
+    margin: 0 1px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.12s ease;
+    position: relative;
+  }
+  #dialogue-text .word:hover {
     background: rgba(255, 216, 102, 0.55);
-  }
-  #phrase-display .word.next-up {
-    background: rgba(255, 216, 102, 0.15);
-    color: rgba(26, 26, 46, 0.6);
-    box-shadow: 0 0 0 2px rgba(255,216,102,0.5) inset;
-  }
-  #phrase-display .word.shake {
-    animation: word-shake 0.3s ease;
-  }
-  @keyframes word-shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-4px); }
-    75% { transform: translateX(4px); }
+    transform: translateY(-1px);
   }
 
-  /* Slot row (for rebuild phase) */
+  /* Hint (English intent on user turns) */
+  #hint {
+    font-size: 14px; color: #5a4a3a;
+    background: rgba(255, 216, 102, 0.25);
+    border-left: 3px solid #ffd866;
+    padding: 10px 14px; border-radius: 6px;
+    margin-bottom: 14px;
+    line-height: 1.5;
+    position: relative;
+  }
+  #hint b { color: #1a1a2e; }
+  #hint .sub {
+    display: block;
+    font-size: 12px; color: #7a6a5a;
+    margin-top: 4px;
+  }
+
+  /* Slot row (for rebuild) */
   #slot-row {
     display: flex; flex-wrap: wrap; gap: 8px;
-    background: #f6f1e0;
-    padding: 16px 18px; border-radius: 12px;
+    background: rgba(255, 255, 255, 0.65);
+    padding: 14px 16px; border-radius: 10px;
     margin-bottom: 14px;
-    min-height: 64px; align-items: center;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
-    border: 2px dashed rgba(0,0,0,0);
-    transition: border-color 0.2s ease, background 0.2s ease;
+    min-height: 60px;
+    align-items: center;
+    border: 2px dashed rgba(90, 58, 26, 0.25);
+    transition: background 0.2s ease, border-color 0.2s ease;
+    position: relative;
   }
-  #slot-row.empty { background: rgba(246, 241, 224, 0.15); border-color: rgba(255,216,102,0.4); }
   #slot-row.empty::before {
-    content: 'Tap word tiles below to fill this in →';
-    color: #8c97b5; font-size: 13px; font-style: italic;
+    content: 'Tap tiles below to build your reply →';
+    color: #7a6a5a; font-size: 13px; font-style: italic;
     width: 100%; text-align: center;
   }
   #slot-row .word {
-    background: rgba(255, 216, 102, 0.85);
-    color: #1a1a2e; padding: 6px 10px; border-radius: 6px;
+    background: #ffd866; color: #1a1a2e;
+    padding: 6px 10px; border-radius: 6px;
     font-size: 18px; font-weight: 700; cursor: pointer;
-    transition: transform 0.12s ease;
   }
   #slot-row .word:hover { transform: translateY(-2px); }
   #slot-row.correct {
     background: #d4f5d4;
-    border: 2px solid #2ecc71;
+    border-color: #2ecc71;
     animation: pulse-correct 0.5s ease;
   }
   @keyframes pulse-correct {
-    0%, 100% { box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
-    50% { box-shadow: 0 4px 14px rgba(46,204,113,0.5), 0 0 24px rgba(46,204,113,0.4); }
+    0%, 100% { box-shadow: 0 0 0 rgba(46, 204, 113, 0); }
+    50% { box-shadow: 0 0 0 6px rgba(46, 204, 113, 0.3); }
   }
 
-  /* Word bank */
+  /* Word bank (tile chips) */
   #bank {
     display: flex; flex-wrap: wrap; gap: 8px;
-    margin-bottom: 14px; min-height: 48px;
+    margin-bottom: 14px;
     justify-content: center;
+    min-height: 50px;
+    position: relative;
   }
   .tile {
-    background: rgba(255, 216, 102, 0.92);
-    color: #1a1a2e;
-    padding: 10px 16px;
-    border: 2px solid #ffd866;
+    background: #ffd866; color: #1a1a2e;
+    padding: 9px 16px;
+    border: 2px solid #d4ad32;
     border-radius: 8px;
     font-size: 17px; font-weight: 700;
     cursor: pointer;
     font-family: inherit;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
-    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
     position: relative;
   }
-  .tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.45); }
+  .tile:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3); }
   .tile:active { transform: translateY(0); }
-  .tile.shake { animation: tile-shake 0.3s ease; background: #ff8a7a; }
+  .tile.shake {
+    animation: tile-shake 0.32s ease;
+    background: #ff8a7a;
+  }
   @keyframes tile-shake {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-5px); }
     75% { transform: translateX(5px); }
   }
-  .tile.used { opacity: 0.2; pointer-events: none; }
 
-  /* Branching options */
+  /* Branching option buttons */
   #branch-row {
     display: flex; flex-wrap: wrap; gap: 10px;
-    justify-content: center; margin-bottom: 14px;
+    margin-bottom: 14px;
+    justify-content: center;
+    position: relative;
   }
   .branch-btn {
-    background: rgba(36, 48, 87, 0.85);
-    color: #e8ecf3;
-    border: 2px solid #344371;
+    background: rgba(36, 48, 87, 0.9);
+    color: #ffd866;
+    border: 2px solid #ffd866;
     border-radius: 10px;
-    padding: 12px 20px;
+    padding: 12px 22px;
     font-size: 14px; font-weight: 700;
     cursor: pointer; font-family: inherit;
-    transition: border-color 0.15s ease, transform 0.12s ease;
+    transition: background 0.15s ease, transform 0.12s ease;
   }
-  .branch-btn:hover { border-color: #ffd866; transform: translateY(-2px); }
+  .branch-btn:hover { background: rgba(46, 60, 110, 0.95); transform: translateY(-2px); }
+
+  /* Actions area */
+  #actions {
+    display: flex; justify-content: flex-end; gap: 10px;
+    position: relative;
+  }
+  .action-btn {
+    background: #ffd866; color: #0f1422;
+    border: none; border-radius: 8px;
+    padding: 11px 30px;
+    font-size: 15px; font-weight: 800; cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    transition: background 0.15s ease, transform 0.15s ease;
+    letter-spacing: 0.5px;
+  }
+  .action-btn:hover { background: #ffe28b; transform: translateY(-2px); }
 
   /* Tooltip */
   .tooltip {
     position: absolute;
     bottom: calc(100% + 8px);
     left: 50%; transform: translateX(-50%);
-    background: #ffd866; color: #0f1422;
+    background: #0f1422; color: #ffd866;
     padding: 8px 12px; border-radius: 8px;
     font-size: 13px; font-weight: 600;
-    white-space: normal; max-width: 260px;
-    box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+    white-space: normal; max-width: 280px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
     z-index: 50;
     pointer-events: none;
     text-align: center;
     animation: tip-in 0.15s ease;
+    border: 1px solid #ffd866;
   }
   .tooltip::after {
     content: '';
@@ -256,41 +262,21 @@
     to   { opacity: 1; transform: translate(-50%, 0); }
   }
 
-  /* Stage actions */
-  #actions {
-    display: flex; justify-content: center; gap: 10px;
-  }
-  .action-btn {
-    background: #ffd866; color: #0f1422;
-    border: none; border-radius: 8px;
-    padding: 11px 28px;
-    font-size: 15px; font-weight: 700; cursor: pointer;
-    font-family: inherit;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
-    transition: background 0.15s ease, transform 0.15s ease;
-  }
-  .action-btn:hover { background: #ffe28b; transform: translateY(-2px); }
-  .action-btn.secondary {
-    background: #243057; color: #e8ecf3;
-    border: 1px solid #344371;
-  }
-  .action-btn.secondary:hover { background: #2e3c6e; }
-  .action-btn:disabled {
-    background: #555a6e; color: #8c97b5;
-    cursor: not-allowed; transform: none; box-shadow: none;
-  }
-
   /* Overlays */
   .overlay {
-    position: fixed; inset: 0; background: rgba(8, 12, 24, 0.92);
+    position: fixed; inset: 0;
+    background: rgba(8, 12, 24, 0.78);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     z-index: 100; padding: 32px;
     overflow-y: auto;
+    color: #e8ecf3;
   }
   .overlay.hidden { display: none; }
   .overlay h1 {
     font-size: 44px; color: #ffd866; margin: 0 0 12px;
-    text-shadow: 0 4px 18px rgba(0,0,0,0.6); letter-spacing: 1px;
+    text-shadow: 0 4px 18px rgba(0, 0, 0, 0.6); letter-spacing: 1px;
     text-align: center;
   }
   .overlay p {
@@ -302,18 +288,15 @@
     text-transform: uppercase; margin-bottom: 8px;
   }
   .overlay .field { width: 100%; max-width: 340px; margin-bottom: 14px; }
-  .overlay input[type=text], .overlay select {
+  .overlay input[type=text] {
     width: 100%;
     padding: 11px 14px;
-    background: #1a2238; border: 2px solid #344371;
+    background: rgba(26, 34, 56, 0.85); border: 2px solid #344371;
     border-radius: 8px;
     color: #e8ecf3; font-size: 16px; font-family: inherit;
   }
-  .overlay input[type=text]:focus, .overlay select:focus {
-    outline: none; border-color: #ffd866;
-  }
+  .overlay input[type=text]:focus { outline: none; border-color: #ffd866; }
 
-  /* Recap on complete */
   #recap {
     background: rgba(36, 48, 87, 0.6);
     border-radius: 12px;
@@ -331,61 +314,205 @@
     font-size: 14px; line-height: 1.7;
     margin: 0;
   }
-  #recap ol li { padding: 2px 0; }
   #recap ol li b { color: #ffd866; }
 
-  /* Akari portrait SVG embedded */
-  .portrait-akari { background: #fce0c8; }
-  .portrait-user {
-    background: linear-gradient(135deg, #5a8aff, #3a5ab8);
-    color: #fff; font-weight: 800;
+  /* Mobile tuning */
+  @media (max-width: 640px) {
+    #dialogue { padding: 18px 18px 22px; max-height: 60vh; min-height: 38vh; }
+    #dialogue-text { font-size: 22px; }
+    .tile { padding: 8px 12px; font-size: 15px; }
   }
 </style>
 </head>
 <body>
 
+<!-- Café scene (background) -->
+<div id="scene">
+  <svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!-- Sky gradient -->
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#a8c8ff"/>
+        <stop offset="60%" stop-color="#f0c8d8"/>
+        <stop offset="100%" stop-color="#ffd0c8"/>
+      </linearGradient>
+      <!-- Wall texture (subtle vertical lines) -->
+      <pattern id="wall-grain" patternUnits="userSpaceOnUse" width="40" height="100">
+        <line x1="20" y1="0" x2="20" y2="100" stroke="#e8d8b8" stroke-width="0.5" opacity="0.5"/>
+      </pattern>
+      <!-- Wood pattern -->
+      <pattern id="wood" patternUnits="userSpaceOnUse" width="80" height="40">
+        <rect width="80" height="40" fill="#7a5030"/>
+        <line x1="0" y1="20" x2="80" y2="20" stroke="#5a3a1a" stroke-width="1.5" opacity="0.5"/>
+        <line x1="0" y1="5" x2="80" y2="5" stroke="#8a6040" stroke-width="0.5" opacity="0.5"/>
+        <line x1="0" y1="35" x2="80" y2="35" stroke="#8a6040" stroke-width="0.5" opacity="0.5"/>
+      </pattern>
+      <!-- Lantern glow -->
+      <radialGradient id="lantern" cx="0.5" cy="0.5" r="0.7">
+        <stop offset="0%" stop-color="#fff2b8" stop-opacity="0.9"/>
+        <stop offset="60%" stop-color="#ffd866" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="#ffd866" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+
+    <!-- Wall (background) -->
+    <rect x="0" y="0" width="1200" height="540" fill="#f3e6cf"/>
+    <rect x="0" y="0" width="1200" height="540" fill="url(#wall-grain)"/>
+
+    <!-- Window frame + sky -->
+    <g class="window">
+      <!-- Outer frame -->
+      <rect x="90" y="70" width="380" height="310" fill="#5a3a1a" rx="4"/>
+      <!-- Window pane -->
+      <rect x="106" y="86" width="348" height="278" fill="url(#sky)" rx="2"/>
+      <!-- Window crossbars -->
+      <line x1="280" y1="86" x2="280" y2="364" stroke="#5a3a1a" stroke-width="6"/>
+      <line x1="106" y1="225" x2="454" y2="225" stroke="#5a3a1a" stroke-width="6"/>
+      <!-- Far buildings -->
+      <rect x="120" y="180" width="50" height="80" fill="#9890a8" opacity="0.7"/>
+      <rect x="175" y="160" width="40" height="100" fill="#a098a0" opacity="0.7"/>
+      <rect x="220" y="200" width="55" height="60" fill="#8870a0" opacity="0.7"/>
+      <rect x="300" y="170" width="45" height="90" fill="#a098a0" opacity="0.7"/>
+      <rect x="350" y="190" width="50" height="70" fill="#9890a8" opacity="0.7"/>
+      <rect x="405" y="180" width="45" height="80" fill="#8870a0" opacity="0.7"/>
+      <!-- Small windows on buildings -->
+      <rect x="128" y="210" width="6" height="8" fill="#ffd866" opacity="0.6"/>
+      <rect x="142" y="210" width="6" height="8" fill="#ffd866" opacity="0.6"/>
+      <rect x="186" y="200" width="6" height="8" fill="#ffd866" opacity="0.6"/>
+      <rect x="200" y="200" width="6" height="8" fill="#ffd866" opacity="0.6"/>
+      <rect x="312" y="200" width="6" height="8" fill="#ffd866" opacity="0.6"/>
+      <rect x="326" y="200" width="6" height="8" fill="#ffd866" opacity="0.6"/>
+      <!-- Cherry blossom branch (corner) -->
+      <path d="M 106 360 Q 130 320, 170 300" stroke="#5a3a1a" stroke-width="3" fill="none"/>
+      <circle cx="120" cy="345" r="6" fill="#ffc0d0" opacity="0.9"/>
+      <circle cx="135" cy="328" r="5" fill="#ffd0d8" opacity="0.9"/>
+      <circle cx="148" cy="315" r="6" fill="#ffc0d0" opacity="0.9"/>
+      <circle cx="160" cy="305" r="5" fill="#ffd0d8" opacity="0.9"/>
+    </g>
+
+    <!-- Wall art (back wall, right of Hikari) -->
+    <g class="wall-art">
+      <rect x="880" y="200" width="100" height="120" fill="#fdf6e3" stroke="#8a6040" stroke-width="3"/>
+      <text x="930" y="280" text-anchor="middle" font-family="serif" font-size="64" fill="#3a2418">茶</text>
+    </g>
+
+    <!-- Paper lantern (upper right) -->
+    <g class="lantern">
+      <!-- String -->
+      <line x1="1010" y1="0" x2="1010" y2="120" stroke="#5a3a1a" stroke-width="2"/>
+      <!-- Cap -->
+      <ellipse cx="1010" cy="125" rx="22" ry="8" fill="#3a2418"/>
+      <!-- Lantern body -->
+      <ellipse cx="1010" cy="170" rx="50" ry="55" fill="#e85a3a"/>
+      <line x1="970" y1="155" x2="1050" y2="155" stroke="#1a1a2e" stroke-width="1.5"/>
+      <line x1="965" y1="170" x2="1055" y2="170" stroke="#1a1a2e" stroke-width="1.5"/>
+      <line x1="965" y1="185" x2="1055" y2="185" stroke="#1a1a2e" stroke-width="1.5"/>
+      <line x1="970" y1="200" x2="1050" y2="200" stroke="#1a1a2e" stroke-width="1.5"/>
+      <!-- Cap bottom -->
+      <ellipse cx="1010" cy="220" rx="20" ry="6" fill="#3a2418"/>
+      <!-- Glow -->
+      <ellipse cx="1010" cy="170" rx="180" ry="200" fill="url(#lantern)" opacity="0.4"/>
+    </g>
+
+    <!-- Wainscoting (lower wall, behind table) -->
+    <rect x="0" y="380" width="1200" height="160" fill="#7a5030"/>
+    <line x1="0" y1="380" x2="1200" y2="380" stroke="#5a3a1a" stroke-width="3"/>
+    <line x1="80" y1="380" x2="80" y2="540" stroke="#5a3a1a" stroke-width="1.5" opacity="0.6"/>
+    <line x1="200" y1="380" x2="200" y2="540" stroke="#5a3a1a" stroke-width="1.5" opacity="0.6"/>
+    <line x1="320" y1="380" x2="320" y2="540" stroke="#5a3a1a" stroke-width="1.5" opacity="0.6"/>
+    <line x1="900" y1="380" x2="900" y2="540" stroke="#5a3a1a" stroke-width="1.5" opacity="0.6"/>
+    <line x1="1020" y1="380" x2="1020" y2="540" stroke="#5a3a1a" stroke-width="1.5" opacity="0.6"/>
+    <line x1="1140" y1="380" x2="1140" y2="540" stroke="#5a3a1a" stroke-width="1.5" opacity="0.6"/>
+
+    <!-- HIKARI - the character behind the table -->
+    <g class="hikari" transform="translate(440, 200)">
+      <!-- Hair back -->
+      <path d="M 50 90 Q 30 30, 160 30 Q 290 30, 270 90 L 290 340 L 30 340 Z" fill="#3a2418"/>
+      <!-- Sweater body -->
+      <path d="M 60 320 Q 40 380, 80 410 L 240 410 Q 280 380, 260 320 Z" fill="#f0e0c8" stroke="#d8c4a8" stroke-width="2"/>
+      <!-- Arms resting on table -->
+      <ellipse cx="100" cy="385" rx="42" ry="16" fill="#f0e0c8" stroke="#d8c4a8" stroke-width="2"/>
+      <ellipse cx="220" cy="385" rx="42" ry="16" fill="#f0e0c8" stroke="#d8c4a8" stroke-width="2"/>
+      <!-- Neck -->
+      <rect x="135" y="270" width="30" height="50" fill="#fce0c8"/>
+      <!-- Sweater neckline curve -->
+      <path d="M 110 320 Q 150 340, 190 320" stroke="#d8c4a8" stroke-width="2.5" fill="none"/>
+      <!-- Face -->
+      <ellipse cx="150" cy="200" rx="68" ry="80" fill="#fce0c8"/>
+      <!-- Side hair (sideburns) -->
+      <path d="M 84 150 L 78 250 Q 90 275, 100 265 L 100 170 Z" fill="#3a2418"/>
+      <path d="M 216 150 L 222 250 Q 210 275, 200 265 L 200 170 Z" fill="#3a2418"/>
+      <!-- Hair forelock / fringe -->
+      <path d="M 86 145 Q 110 90, 150 110 Q 190 90, 214 145 L 214 190 Q 195 165, 150 175 Q 105 165, 86 190 Z" fill="#3a2418"/>
+      <!-- Eyebrows -->
+      <path d="M 115 188 Q 125 184, 135 190" stroke="#3a2418" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M 165 190 Q 175 184, 185 188" stroke="#3a2418" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <!-- Eyes -->
+      <ellipse cx="125" cy="210" rx="8" ry="10" fill="#1a1a2e"/>
+      <ellipse cx="175" cy="210" rx="8" ry="10" fill="#1a1a2e"/>
+      <ellipse cx="127" cy="206" rx="2.5" ry="3.5" fill="white"/>
+      <ellipse cx="177" cy="206" rx="2.5" ry="3.5" fill="white"/>
+      <!-- Blush -->
+      <ellipse cx="100" cy="245" rx="12" ry="6" fill="#ffb0a0" opacity="0.6"/>
+      <ellipse cx="200" cy="245" rx="12" ry="6" fill="#ffb0a0" opacity="0.6"/>
+      <!-- Smile -->
+      <path d="M 135 255 Q 150 268, 165 255" stroke="#a0584a" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+      <!-- Matcha cup (between hands on the table) -->
+      <ellipse cx="150" cy="380" rx="32" ry="9" fill="#3a4a2e"/>
+      <path d="M 118 380 Q 118 415, 150 419 Q 182 415, 182 380 Z" fill="#5a7a4a" stroke="#3a4a2e" stroke-width="1.5"/>
+      <ellipse cx="150" cy="380" rx="28" ry="6" fill="#7aa84a"/>
+      <!-- Steam -->
+      <path d="M 138 370 Q 144 350, 140 332" stroke="#fff" stroke-width="2.5" fill="none" opacity="0.65"/>
+      <path d="M 152 370 Q 158 350, 154 332" stroke="#fff" stroke-width="2.5" fill="none" opacity="0.65"/>
+      <path d="M 165 370 Q 170 350, 168 332" stroke="#fff" stroke-width="2.5" fill="none" opacity="0.65"/>
+    </g>
+
+    <!-- Café table edge (foreground - this is what Hikari's sitting at) -->
+    <rect x="0" y="540" width="1200" height="80" fill="url(#wood)"/>
+    <line x1="0" y1="540" x2="1200" y2="540" stroke="#3a2010" stroke-width="3"/>
+
+    <!-- A small cup on the player's side of the table -->
+    <g class="player-cup" transform="translate(950, 560)">
+      <ellipse cx="0" cy="-2" rx="22" ry="6" fill="#3a2418"/>
+      <path d="M -22 -2 Q -22 28, 0 32 Q 22 28, 22 -2 Z" fill="#a87a4a" stroke="#5a3a1a" stroke-width="1.5"/>
+      <ellipse cx="0" cy="-2" rx="18" ry="4" fill="#5a3a1a"/>
+      <!-- Cup handle -->
+      <path d="M 22 4 Q 32 4, 32 16 Q 32 24, 22 24" stroke="#5a3a1a" stroke-width="3" fill="none"/>
+      <!-- Steam -->
+      <path d="M -10 -10 Q -6 -25, -8 -38" stroke="#fff" stroke-width="2" fill="none" opacity="0.5"/>
+      <path d="M 4 -10 Q 8 -25, 6 -38" stroke="#fff" stroke-width="2" fill="none" opacity="0.5"/>
+    </g>
+
+    <!-- Floor under table (will be hidden by dialogue box on most screens) -->
+    <rect x="0" y="620" width="1200" height="180" fill="#3a2418"/>
+  </svg>
+</div>
+
 <!-- Top bar -->
 <div id="topbar">
   <a class="back" href="index.html">← Library</a>
-  <span class="title">Lesson 1 · Meeting Someone New</span>
+  <span class="title">Lesson 1 · Meeting Hikari at the Café</span>
   <span class="spacer"></span>
   <span class="progress"><span class="label">Turn</span><span class="value" id="progress-value">1 / 13</span></span>
 </div>
 
-<div id="stage">
-  <!-- Chat history -->
-  <div id="chat"></div>
-
-  <!-- Active turn panel -->
-  <div id="panel">
-    <div class="stage-header">
-      <div class="who" id="stage-who"><strong>Akari</strong> says…</div>
-    </div>
-    <div class="stage-instr" id="stage-instr">Tap each word in order to repeat it.</div>
-
-    <!-- Phrase display (repeat + hover phases) -->
-    <div id="phrase-display"></div>
-
-    <!-- Slot row (rebuild phase) -->
-    <div id="slot-row" class="hidden"></div>
-
-    <!-- Word bank (rebuild phase) -->
-    <div id="bank" class="hidden"></div>
-
-    <!-- Branching options (turn 12) -->
-    <div id="branch-row" class="hidden"></div>
-
-    <!-- Actions -->
-    <div id="actions"></div>
-  </div>
+<!-- Dialogue panel (sticky bottom, VN-style) -->
+<div id="dialogue">
+  <div id="name-plate">HIKARI</div>
+  <div id="dialogue-text"></div>
+  <div id="hint" style="display: none;"></div>
+  <div id="slot-row" class="empty" style="display: none;"></div>
+  <div id="bank" style="display: none;"></div>
+  <div id="branch-row" style="display: none;"></div>
+  <div id="actions"></div>
 </div>
 
 <!-- Start overlay -->
 <div class="overlay" id="start-overlay">
-  <h1>Lesson 1: Meeting Someone New</h1>
-  <p>You're at a language-exchange café in Tokyo. Akari is about to come over and say hi. Learn to greet her, introduce yourself, and tell her a bit about you — all in natural, polite Japanese.</p>
+  <h1>Lesson 1: Meeting Hikari at the Café</h1>
+  <p>You're sitting at a small Japanese café in the afternoon. Hikari is across the table from you — she's about to say hi. Learn to greet her, introduce yourself, and tell her a bit about you, all in natural, polite Japanese.</p>
   <div class="field">
-    <div class="small-label">Your name (Akari will call you this)</div>
+    <div class="small-label">Your name (Hikari will call you this)</div>
     <input type="text" id="name-input" value="Alex" maxlength="20">
   </div>
   <div class="field">
@@ -399,19 +526,18 @@
 <div class="overlay hidden" id="complete-overlay">
   <h1>よくできました! Well done!</h1>
   <p>You just had a real introduction conversation in polite Japanese — and you did it without ever using <i>anata</i>. Here are the phrases you used:</p>
-  <div id="recap"><h3>Phrases learned</h3><ol id="recap-list"></ol></div>
+  <div id="recap"><h3>Phrases from the conversation</h3><ol id="recap-list"></ol></div>
   <a href="index.html" class="action-btn" style="text-decoration: none;">← Back to Library</a>
 </div>
 
 <script>
 /* ============================================================
-   LESSON DATA
-   Each word: { w: token (as written), m: meaning shown on hover }
-   `instr` is the romaji repeat-and-rebuild instruction shown for
-   Akari turns; `hint` is the English intent shown for user turns.
+   LESSON DATA — 13 turns of an introduction-arc conversation
+   with Hikari. Each word: { w: token (as written),
+   m: meaning shown on hover }.
    ============================================================ */
 const LESSON = {
-  characterName: 'Akari',
+  characterName: 'Hikari',
   turns: [
     // 1
     { speaker: 'ai',
@@ -420,7 +546,7 @@ const LESSON = {
     { speaker: 'user',
       hint: 'Say hi back.',
       words: [{ w: 'Konnichiwa!', m: 'hello / good day' }] },
-    // 3 — Akari introduces herself
+    // 3 — Hikari introduces herself
     { speaker: 'ai',
       words: [
         { w: 'Hajimemashite.', m: 'nice to meet you' },
@@ -428,12 +554,12 @@ const LESSON = {
         { w: 'no', m: '(possessive — like "of" or "\'s")' },
         { w: 'namae', m: 'name' },
         { w: 'wa', m: '(topic marker — "as for…")' },
-        { w: 'Akari', m: 'her name (Akari)' },
+        { w: 'Hikari', m: 'her name (Hikari)' },
         { w: 'desu.', m: 'is / am / are (polite)' },
       ] },
     // 4 — User introduces themselves
     { speaker: 'user',
-      hint: 'Introduce yourself the same way Akari did. Tell her your name.',
+      hint: 'Introduce yourself the same way Hikari did. Tell her your name.',
       words: [
         { w: 'Hajimemashite.', m: 'nice to meet you' },
         { w: 'Watashi', m: 'I / me' },
@@ -443,10 +569,10 @@ const LESSON = {
         { w: '{NAME}', m: 'your name' },
         { w: 'desu.', m: 'is / am / are (polite)' },
       ] },
-    // 5 — Akari asks how you are
+    // 5 — Hikari asks how you are
     { speaker: 'ai',
       words: [
-        { w: '{NAME}-san,', m: 'your name + -san (polite honorific, like Mr./Ms.) — Akari is addressing you' },
+        { w: '{NAME}-san,', m: 'your name + -san (polite honorific, like Mr./Ms.) — Hikari is addressing you' },
         { w: 'genki', m: 'fine / well / energetic' },
         { w: 'desu', m: 'is / am / are (polite)' },
         { w: 'ka?', m: '(turns the sentence into a question)' },
@@ -457,10 +583,10 @@ const LESSON = {
       words: [
         { w: 'Genki', m: 'fine / well / energetic' },
         { w: 'desu.', m: 'is / am / are' },
-        { w: 'Akari-san', m: 'her name + -san — use the person\'s name instead of "anata" when addressing them' },
+        { w: 'Hikari-san', m: 'her name + -san — use the person\'s name instead of "anata" when addressing them' },
         { w: 'wa?', m: '(topic marker — used alone here means "how about you?")' },
       ] },
-    // 7 — Akari: I'm good too! (short connector)
+    // 7 — Hikari: I'm good too!
     { speaker: 'ai',
       words: [
         { w: 'Watashi', m: 'I / me' },
@@ -468,10 +594,10 @@ const LESSON = {
         { w: 'genki', m: 'fine / well' },
         { w: 'desu!', m: 'is / am / are' },
       ] },
-    // 8 — Akari asks where you're from
+    // 8 — Hikari asks where you're from
     { speaker: 'ai',
       words: [
-        { w: '{NAME}-san,', m: 'your name + -san — Akari is addressing you politely' },
+        { w: '{NAME}-san,', m: 'your name + -san — Hikari is addressing you politely' },
         { w: 'doko', m: 'where' },
         { w: 'kara', m: '(from)' },
         { w: 'kimashita', m: 'came (past tense of "to come")' },
@@ -485,7 +611,7 @@ const LESSON = {
         { w: 'kara', m: '(from)' },
         { w: 'kimashita.', m: 'came (past tense of "to come")' },
       ] },
-    // 10 — Akari: that's a nice place
+    // 10 — Hikari: that's a nice place
     { speaker: 'ai',
       words: [
         { w: '{COUNTRY}!', m: 'your country' },
@@ -496,7 +622,7 @@ const LESSON = {
         { w: 'desu', m: 'is' },
         { w: 'ne!', m: '(seeking agreement — like "isn\'t it?")' },
       ] },
-    // 11 — Akari: what are you doing here?
+    // 11 — Hikari: what are you doing here?
     { speaker: 'ai',
       words: [
         { w: 'Koko', m: 'here' },
@@ -531,7 +657,7 @@ const LESSON = {
             { w: 'sundeimasu.', m: 'am living / live (present continuous of "to live")' },
           ] },
       ] },
-    // 13 — Akari closes
+    // 13 — Hikari closes
     { speaker: 'ai',
       words: [
         { w: 'Soudesu', m: 'is that so' },
@@ -549,16 +675,15 @@ const LESSON = {
    STATE
    ============================================================ */
 const state = {
-  phase: 'idle',     // idle | repeat | hover | rebuild | complete | done | branch-pick
+  phase: 'idle',     // idle | speaking | rebuild | branch-pick | done
   turnIdx: 0,
   userName: 'Alex',
   userCountry: 'Amerika',
-  expectedSeq: [],   // resolved words for the current turn (in order)
-  repeatPos: 0,
+  expectedSeq: [],
   rebuildPlaced: [],
   rebuildBank: [],
   branchPick: null,
-  history: [],       // [{speaker, words}]
+  history: [],
 };
 
 /* ============================================================
@@ -583,100 +708,58 @@ function substitute(word) {
     .replace(/\{COUNTRY\}/g, state.userCountry);
   return { w, m: word.m };
 }
-function turnWords(turn) {
-  if (turn.branching) {
-    const opt = turn.options[state.branchPick];
-    return opt.words.map(substitute);
-  }
-  return turn.words.map(substitute);
-}
-function joinedPhrase(words) {
-  return words.map(w => w.w).join(' ');
-}
 
 /* ============================================================
-   PORTRAIT SVG
-   ============================================================ */
-function akariSvg() {
-  return '<svg viewBox="0 0 100 100">' +
-    // Hair back
-    '<path d="M 12 38 Q 50 -2, 88 38 L 88 70 L 12 70 Z" fill="#3a2418"/>' +
-    // Face
-    '<ellipse cx="50" cy="60" rx="28" ry="33" fill="#fce0c8"/>' +
-    // Hair forelock
-    '<path d="M 22 30 Q 36 22, 50 30 Q 64 22, 78 30 L 78 50 Q 62 42, 50 46 Q 38 42, 22 50 Z" fill="#3a2418"/>' +
-    // Eyes
-    '<ellipse cx="40" cy="62" rx="3.5" ry="4" fill="#1a1a2e"/>' +
-    '<ellipse cx="60" cy="62" rx="3.5" ry="4" fill="#1a1a2e"/>' +
-    '<circle cx="41" cy="61" r="1.2" fill="white"/>' +
-    '<circle cx="61" cy="61" r="1.2" fill="white"/>' +
-    // Blush
-    '<ellipse cx="34" cy="72" rx="4" ry="2.5" fill="#ffb0a0" opacity="0.6"/>' +
-    '<ellipse cx="66" cy="72" rx="4" ry="2.5" fill="#ffb0a0" opacity="0.6"/>' +
-    // Smile
-    '<path d="M 42 78 Q 50 84, 58 78" stroke="#a0584a" stroke-width="2" fill="none" stroke-linecap="round"/>' +
-    // Collar
-    '<path d="M 12 100 Q 30 88, 50 88 Q 70 88, 88 100 Z" fill="#5a8aff"/>' +
-    '</svg>';
-}
-
-/* ============================================================
-   CHAT HISTORY
+   HISTORY (used only for the complete-overlay recap)
    ============================================================ */
 function appendHistory(speaker, words) {
   state.history.push({ speaker, words });
-  const chat = document.getElementById('chat');
-  const row = document.createElement('div');
-  row.className = 'bubble-row ' + speaker;
-  const portrait = document.createElement('div');
-  portrait.className = 'portrait ' + (speaker === 'ai' ? 'portrait-akari' : 'portrait-user');
-  portrait.innerHTML = speaker === 'ai'
-    ? akariSvg()
-    : escapeHtml((state.userName || 'You').charAt(0).toUpperCase());
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble';
-  const name = speaker === 'ai' ? 'Akari' : 'You';
-  bubble.innerHTML = '<span class="name">' + escapeHtml(name) + '</span>' +
-    words.map(w => '<span class="word">' + escapeHtml(w.w) + '</span>').join(' ');
-  row.appendChild(portrait);
-  row.appendChild(bubble);
-  chat.appendChild(row);
-  chat.scrollTop = chat.scrollHeight;
 }
 
 /* ============================================================
-   RENDER ACTIVE TURN
+   DIALOGUE PANEL HELPERS
+   ============================================================ */
+function setNamePlate(text) {
+  document.getElementById('name-plate').textContent = text;
+}
+function clearPanel() {
+  document.getElementById('dialogue-text').innerHTML = '';
+  const hintEl = document.getElementById('hint');
+  hintEl.style.display = 'none';
+  hintEl.innerHTML = '';
+  const slot = document.getElementById('slot-row');
+  slot.style.display = 'none';
+  slot.innerHTML = '';
+  slot.classList.add('empty');
+  slot.classList.remove('correct');
+  const bank = document.getElementById('bank');
+  bank.style.display = 'none';
+  bank.innerHTML = '';
+  const branch = document.getElementById('branch-row');
+  branch.style.display = 'none';
+  branch.innerHTML = '';
+  document.getElementById('actions').innerHTML = '';
+}
+
+/* ============================================================
+   RENDER TURN
    ============================================================ */
 function renderTurn() {
   const turn = LESSON.turns[state.turnIdx];
   if (!turn) { showComplete(); return; }
 
-  // Resolve substitutions
   state.branchPick = null;
   state.expectedSeq = turn.branching ? [] : turn.words.map(substitute);
-  state.repeatPos = 0;
   state.rebuildPlaced = [];
   state.rebuildBank = [];
 
-  document.getElementById('progress-value').textContent = (state.turnIdx + 1) + ' / ' + LESSON.turns.length;
-  document.getElementById('stage-who').innerHTML =
-    turn.speaker === 'ai'
-      ? '<strong>Akari</strong> says…'
-      : '<strong>You</strong> reply';
+  document.getElementById('progress-value').textContent =
+    (state.turnIdx + 1) + ' / ' + LESSON.turns.length;
 
-  // Reset all stage UI
-  document.getElementById('phrase-display').classList.remove('hidden');
-  document.getElementById('phrase-display').innerHTML = '';
-  document.getElementById('slot-row').classList.add('hidden');
-  document.getElementById('slot-row').innerHTML = '';
-  document.getElementById('bank').classList.add('hidden');
-  document.getElementById('bank').innerHTML = '';
-  document.getElementById('branch-row').classList.add('hidden');
-  document.getElementById('branch-row').innerHTML = '';
-  document.getElementById('actions').innerHTML = '';
+  clearPanel();
 
   if (turn.speaker === 'ai') {
-    startRepeatPhase();
+    startSpeakingPhase();
   } else if (turn.branching) {
     startBranchPhase();
   } else {
@@ -685,118 +768,63 @@ function renderTurn() {
 }
 
 /* ============================================================
-   PHASE: REPEAT (AI turns only)
+   PHASE: SPEAKING (Hikari turns)
+   Show the phrase with all words hoverable; Continue button.
    ============================================================ */
-function startRepeatPhase() {
-  state.phase = 'repeat';
-  document.getElementById('stage-instr').className = 'stage-instr';
-  document.getElementById('stage-instr').textContent =
-    'Tap each word in order to repeat what Akari said.';
-  renderPhraseDisplay({ interactive: true, dimUntilSpoken: true });
-}
-
-function renderPhraseDisplay(opts) {
-  opts = opts || {};
-  const el = document.getElementById('phrase-display');
-  el.innerHTML = '';
-  state.expectedSeq.forEach((word, i) => {
+function startSpeakingPhase() {
+  state.phase = 'speaking';
+  setNamePlate('HIKARI');
+  const textEl = document.getElementById('dialogue-text');
+  textEl.innerHTML = '';
+  state.expectedSeq.forEach((word) => {
     const span = document.createElement('span');
     span.className = 'word';
     span.textContent = word.w;
-    span.dataset.idx = i;
-
-    if (opts.dimUntilSpoken) {
-      // Dim until spoken; mark the next-up word
-      if (i < state.repeatPos) span.classList.add('spoken');
-      else if (i === state.repeatPos) span.classList.add('next-up');
-    } else {
-      // Hover phase — all words lit
-      span.classList.add('spoken');
-    }
-
-    if (opts.interactive) {
-      if (opts.dimUntilSpoken) {
-        span.addEventListener('click', () => onWordRepeatClick(i, span));
-      } else {
-        // Hover phase: click/tap to toggle tooltip
-        attachTooltip(span, word.m);
-      }
-    }
-    el.appendChild(span);
+    attachTooltip(span, word.m);
+    textEl.appendChild(span);
+    textEl.appendChild(document.createTextNode(' '));
   });
-}
-
-function onWordRepeatClick(idx, span) {
-  if (state.phase !== 'repeat') return;
-  if (idx === state.repeatPos) {
-    state.repeatPos++;
-    span.classList.remove('next-up');
-    span.classList.add('spoken');
-    // Mark next-up
-    const nextSpan = document.querySelector('#phrase-display .word[data-idx="' + state.repeatPos + '"]');
-    if (nextSpan) nextSpan.classList.add('next-up');
-    if (state.repeatPos >= state.expectedSeq.length) {
-      // Move to hover phase
-      setTimeout(startHoverPhase, 250);
-    }
-  } else {
-    span.classList.add('shake');
-    setTimeout(() => span.classList.remove('shake'), 300);
-  }
-}
-
-/* ============================================================
-   PHASE: HOVER (AI turns only)
-   ============================================================ */
-function startHoverPhase() {
-  state.phase = 'hover';
-  document.getElementById('stage-instr').className = 'stage-instr';
-  document.getElementById('stage-instr').textContent =
-    'Now tap any word to see what it means. When you\'re ready, hit Continue.';
-  renderPhraseDisplay({ interactive: true, dimUntilSpoken: false });
+  // Continue button
   const actions = document.getElementById('actions');
-  actions.innerHTML = '';
   const btn = document.createElement('button');
   btn.className = 'action-btn';
-  btn.textContent = 'Continue → Rebuild';
-  btn.addEventListener('click', startAiRebuildPhase);
+  btn.textContent = state.turnIdx >= LESSON.turns.length - 1
+    ? 'Finish lesson →'
+    : 'Continue ▶';
+  btn.addEventListener('click', () => {
+    appendHistory('ai', state.expectedSeq.map(w => ({ w: w.w, m: w.m })));
+    advance();
+  });
   actions.appendChild(btn);
 }
 
 /* ============================================================
-   PHASE: REBUILD (both AI turns and user turns)
+   PHASE: USER REBUILD (user-reply turns)
    ============================================================ */
-function startAiRebuildPhase() {
-  state.phase = 'rebuild';
-  document.getElementById('stage-instr').className = 'stage-instr';
-  document.getElementById('stage-instr').textContent =
-    'Reconstruct the phrase by tapping the tiles in the correct order. Tap a tile in the slot row to send it back.';
-  document.getElementById('phrase-display').classList.add('hidden');
-  setupRebuildUI();
-}
-
 function startUserRebuildPhase() {
   state.phase = 'rebuild';
   const turn = LESSON.turns[state.turnIdx];
   state.expectedSeq = turn.words.map(substitute);
-  document.getElementById('phrase-display').classList.add('hidden');
-  document.getElementById('stage-instr').className = 'stage-instr hint';
-  document.getElementById('stage-instr').innerHTML =
+  setNamePlate('YOU');
+  // No dialogue text — they're building their reply
+  document.getElementById('dialogue-text').innerHTML = '';
+  // Hint
+  const hintEl = document.getElementById('hint');
+  hintEl.style.display = 'block';
+  hintEl.innerHTML =
     '<b>Reply:</b> ' + escapeHtml(turn.hint) +
-    '<br><span style="font-size:12px;color:#8c97b5">Tap tiles to build your reply. Tap a tile to see what it means.</span>';
+    '<span class="sub">Tap tiles to build your reply. Tap a tile to peek at its meaning.</span>';
   setupRebuildUI();
 }
 
 function setupRebuildUI() {
-  // Initialize bank with shuffled indices
   state.rebuildPlaced = [];
   state.rebuildBank = shuffle(state.expectedSeq.map((_, i) => i));
 
   const slot = document.getElementById('slot-row');
+  slot.style.display = 'flex';
   const bank = document.getElementById('bank');
-  slot.classList.remove('hidden');
-  bank.classList.remove('hidden');
-  slot.classList.remove('correct');
+  bank.style.display = 'flex';
   renderSlotRow();
   renderBank();
   document.getElementById('actions').innerHTML = '';
@@ -829,8 +857,7 @@ function renderBank() {
     tile.className = 'tile';
     tile.dataset.idx = idx;
     tile.textContent = word.w;
-    tile.addEventListener('click', (e) => {
-      // If a tooltip is open on this tile, don't also place it.
+    tile.addEventListener('click', () => {
       if (tile.dataset.tooltipOpen === '1') return;
       onBankClick(idx, tile);
     });
@@ -843,7 +870,6 @@ function onBankClick(idx, tile) {
   if (state.phase !== 'rebuild') return;
   const expectedNext = state.rebuildPlaced.length;
   if (idx === expectedNext) {
-    // Correct: move tile from bank to slot
     state.rebuildPlaced.push(idx);
     state.rebuildBank = state.rebuildBank.filter(x => x !== idx);
     renderSlotRow();
@@ -852,7 +878,6 @@ function onBankClick(idx, tile) {
       onRebuildComplete();
     }
   } else {
-    // Wrong: shake
     tile.classList.add('shake');
     setTimeout(() => tile.classList.remove('shake'), 320);
   }
@@ -871,21 +896,49 @@ function onSlotClick(idx) {
 
 function onRebuildComplete() {
   document.getElementById('slot-row').classList.add('correct');
-  const turn = LESSON.turns[state.turnIdx];
-  const speaker = turn.speaker;
-  // Build the words array (post-substitution) for history
   const words = state.expectedSeq.map(w => ({ w: w.w, m: w.m }));
+  appendHistory('user', words);
   setTimeout(() => {
-    appendHistory(speaker, words);
-    document.getElementById('actions').innerHTML = '';
-    const btn = document.createElement('button');
-    btn.className = 'action-btn';
-    btn.textContent = state.turnIdx >= LESSON.turns.length - 1 ? 'Finish lesson →' : 'Next →';
-    btn.addEventListener('click', advance);
-    document.getElementById('actions').appendChild(btn);
-  }, 450);
+    advance();
+  }, 600);
 }
 
+/* ============================================================
+   PHASE: BRANCH PICK (turn 12)
+   ============================================================ */
+function startBranchPhase() {
+  state.phase = 'branch-pick';
+  const turn = LESSON.turns[state.turnIdx];
+  setNamePlate('YOU');
+  document.getElementById('dialogue-text').innerHTML = '';
+  // Hint
+  const hintEl = document.getElementById('hint');
+  hintEl.style.display = 'block';
+  hintEl.innerHTML = '<b>Your turn:</b> ' + escapeHtml(turn.hint);
+  // Branch buttons
+  const row = document.getElementById('branch-row');
+  row.style.display = 'flex';
+  row.innerHTML = '';
+  turn.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'branch-btn';
+    btn.textContent = opt.label;
+    btn.addEventListener('click', () => {
+      state.branchPick = i;
+      state.expectedSeq = opt.words.map(substitute);
+      row.style.display = 'none';
+      hintEl.innerHTML =
+        '<b>Now build it:</b> ' + escapeHtml(opt.label) +
+        '<span class="sub">Tap tiles to build your reply.</span>';
+      setupRebuildUI();
+    });
+    row.appendChild(btn);
+  });
+}
+
+/* ============================================================
+   ADVANCE
+   ============================================================ */
 function advance() {
   state.turnIdx++;
   if (state.turnIdx >= LESSON.turns.length) {
@@ -896,51 +949,20 @@ function advance() {
 }
 
 /* ============================================================
-   PHASE: BRANCH PICK (turn 12)
-   ============================================================ */
-function startBranchPhase() {
-  state.phase = 'branch-pick';
-  const turn = LESSON.turns[state.turnIdx];
-  document.getElementById('stage-instr').className = 'stage-instr hint';
-  document.getElementById('stage-instr').innerHTML =
-    '<b>Your turn:</b> ' + escapeHtml(turn.hint);
-  document.getElementById('phrase-display').classList.add('hidden');
-  const row = document.getElementById('branch-row');
-  row.classList.remove('hidden');
-  row.innerHTML = '';
-  turn.options.forEach((opt, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'branch-btn';
-    btn.textContent = opt.label;
-    btn.addEventListener('click', () => {
-      state.branchPick = i;
-      state.expectedSeq = opt.words.map(substitute);
-      row.classList.add('hidden');
-      // Show the rebuild UI for this option
-      document.getElementById('stage-instr').className = 'stage-instr hint';
-      document.getElementById('stage-instr').innerHTML =
-        '<b>Now build it:</b> ' + escapeHtml(opt.label) +
-        '<br><span style="font-size:12px;color:#8c97b5">Tap tiles to build your reply.</span>';
-      setupRebuildUI();
-    });
-    row.appendChild(btn);
-  });
-}
-
-/* ============================================================
    TOOLTIPS (hover on desktop, tap-to-toggle on touch)
    ============================================================ */
 function attachTooltip(el, meaning) {
   if (!meaning) return;
   let tooltipEl = null;
   let showTimer = null;
+  let hideTimer = null;
 
   function show() {
     if (tooltipEl) return;
     tooltipEl = document.createElement('div');
     tooltipEl.className = 'tooltip';
     tooltipEl.textContent = meaning;
-    el.style.position = el.style.position || 'relative';
+    if (!el.style.position) el.style.position = 'relative';
     el.appendChild(tooltipEl);
     el.dataset.tooltipOpen = '1';
   }
@@ -951,21 +973,20 @@ function attachTooltip(el, meaning) {
 
   el.addEventListener('mouseenter', () => {
     clearTimeout(showTimer);
+    clearTimeout(hideTimer);
     showTimer = setTimeout(show, 100);
   });
   el.addEventListener('mouseleave', () => {
     clearTimeout(showTimer);
     hide();
   });
-  // Tap-to-toggle for touch / explicit clicks (when the click is also a "place tile"
-  // action, the bank handler checks dataset.tooltipOpen and short-circuits.)
-  el.addEventListener('click', (e) => {
+  el.addEventListener('click', () => {
     if (tooltipEl) {
       hide();
     } else {
       show();
-      // Auto-hide after 2.5s on tap
-      setTimeout(() => { if (tooltipEl) hide(); }, 2500);
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => { if (tooltipEl) hide(); }, 2500);
     }
   });
 }
@@ -977,11 +998,11 @@ function showComplete() {
   state.phase = 'done';
   const list = document.getElementById('recap-list');
   list.innerHTML = '';
-  state.history.forEach((entry, i) => {
+  state.history.forEach((entry) => {
     const li = document.createElement('li');
-    const speaker = entry.speaker === 'ai' ? 'Akari' : 'You';
+    const speaker = entry.speaker === 'ai' ? 'Hikari' : 'You';
     const text = entry.words.map(w => w.w).join(' ');
-    li.innerHTML = '<b>' + speaker + ':</b> ' + escapeHtml(text);
+    li.innerHTML = '<b>' + escapeHtml(speaker) + ':</b> ' + escapeHtml(text);
     list.appendChild(li);
   });
   document.getElementById('complete-overlay').classList.remove('hidden');
@@ -998,7 +1019,6 @@ document.getElementById('start-btn').addEventListener('click', () => {
   document.getElementById('start-overlay').classList.add('hidden');
   state.turnIdx = 0;
   state.history = [];
-  document.getElementById('chat').innerHTML = '';
   renderTurn();
 });
 </script>
