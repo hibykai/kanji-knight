@@ -18,9 +18,9 @@ A side-view arena where a knight stands on the left and a T-Rex slowly advances 
 
 ### 🗼 Tower Rush — `tower-rush.html`
 
-Top-down-ish tower defense. A tower at the right edge of the arena fires arrows automatically at monsters walking the path from the left. Wrong kanji answers buff the monsters, right ones earn power-ups to fight back. Every 30 seconds the wave automatically gets tougher.
+Top-down-ish tower defense. A tower at the right edge of the arena fires arrows automatically at monsters walking the path from the left. Wrong answers buff the monsters, right ones earn power-ups to fight back. Every 30 seconds the wave automatically gets tougher.
 
-- **Quiz pool:** ~2,000 single kanji from the JLPT-tagged dataset (N5 to N1, cumulative).
+- **Quiz pool:** ~500 JLPT-tagged words (same shared dataset as Kanji Knight) — kanji + kana mix, with reading and English meaning on every answer card.
 - **Configurable:** tower starting HP (10–50), JLPT difficulty, Hiragana / Romaji.
 - **Power-ups earned every 3 correct:** 🏹 Arrows (volley everyone), 💣 Bomb (AoE), 🔥 Firewall (block + burn), ⚡ Lightning (instakill lead), 🩹 Repair (+5 tower HP).
 - **Wrong answer = monster boost (auto-applied):** 🛡️ Lead-monster armor (+2 HP), 💨 Speed boost for 5s, 👹 Boss spawn, 📈 Two extra spawns.
@@ -30,31 +30,31 @@ Top-down-ish tower defense. A tower at the right edge of the arena fires arrows 
 
 ```
 index.html         Library landing page (game card grid)
-kanji-knight.html  Kanji Knight (words quiz)
-tower-rush.html    Tower Rush (kanji-driven tower defense)
-kanji-data.js      Shared ~2,000-entry kanji dataset (KANJI_DATA + pushChunk + dedupe)
+kanji-knight.html  Kanji Knight (T-Rex chase, words quiz)
+tower-rush.html    Tower Rush (tower defense, words quiz)
+words-data.js      Shared ~500-entry JLPT words dataset (active)
+kanji-data.js      Shared ~2,000-entry single-kanji dataset (reference; not loaded by either game)
 README.md
 ```
 
-Both games `<script src="kanji-data.js">` the shared kanji file. Each game is self-contained otherwise — Kanji Knight also has its own inline WORDS_DATA. To add a new game, drop in another `.html` file and link it from `index.html`.
+Both games `<script src="words-data.js">` the shared words file — single source of truth, fix a reading once and both games benefit. `kanji-data.js` is kept as a reference dataset (and as a fallback if you ever want to swap a game back to single-kanji drills). To add a new game, drop in another `.html` file, load the data file(s) you need, and link it from `index.html`.
 
 ## Datasets
 
-### Kanji (shared) — `kanji-data.js`
-
-Each entry: `{k: "漢", h: "かん", j: 5}` where `j` is the JLPT level (5 easiest, 1 hardest). Pushed easiest-first via `pushChunk(level, ...entries)`; runtime de-dupe keeps each kanji at its easiest level.
-
-To re-classify a kanji, move its entry into a different `pushChunk(...)` block. To swap a reading, edit the `h:` value.
-
-### Words (Kanji Knight only) — inline in `kanji-knight.html`
+### Words (active, shared) — `words-data.js`
 
 Each entry: `{w: "食べる", h: "たべる", e: "to eat", j: 5}`.
 
 - `w` — the written form (kanji + kana mix, kana only, or katakana)
 - `h` — the full hiragana reading
 - `e` — the English meaning
+- `j` — JLPT level (5 easiest, 1 hardest)
 
-Currently ~500 words across 5 JLPT levels. Real JLPT lists are 800+ (N5) to 8,500+ (N1) — easy to grow by appending to any `pushWords(level, ...)` block.
+Currently ~500 words across 5 JLPT levels. Real JLPT lists are 800+ (N5) to 8,500+ (N1) — easy to grow by appending to any `pushWords(level, ...)` block. Pushed easiest-first; runtime de-dupe keeps each word at its easiest level. Edits flow to both games automatically.
+
+### Kanji (reference) — `kanji-data.js`
+
+Each entry: `{k: "漢", h: "かん", j: 5}`. Same `pushChunk(level, ...entries)` pattern, ~2,000 entries from the Jōyō list. Not loaded by either game right now. Available if you ever want to swap a game back to single-kanji drills — change the `<script src>` and update `activePool()` to filter `KANJI_DATA` instead of `WORDS_DATA`.
 
 ## Hosting
 

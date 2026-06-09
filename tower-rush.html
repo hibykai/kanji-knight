@@ -249,14 +249,17 @@
     justify-content: center;
   }
   .option-card {
-    width: 200px; height: 88px;
+    width: 210px; height: 110px;
     background: #f6f1e0; border: 3px solid #ffd866; border-radius: 12px;
     box-shadow: 0 6px 16px rgba(0,0,0,0.4);
-    font-size: 28px; font-weight: 700; color: #1a1a2e;
+    color: #1a1a2e;
     font-family: inherit; cursor: pointer; position: relative;
     transition: transform 0.12s ease, box-shadow 0.12s ease;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 10px 12px; gap: 4px; text-align: center;
   }
+  .option-card .reading { font-size: 24px; font-weight: 700; line-height: 1.1; }
+  .option-card .meaning { font-size: 13px; color: #4a4a5e; line-height: 1.2; font-weight: 500; }
   .option-card:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: 0 10px 22px rgba(0,0,0,0.55);
@@ -440,8 +443,8 @@
   <button class="restart-btn" id="restart-btn">Play Again</button>
 </div>
 
-<!-- Shared kanji dataset -->
-<script src="kanji-data.js"></script>
+<!-- Shared JLPT words dataset (same one Kanji Knight uses) -->
+<script src="words-data.js"></script>
 
 <script>
 /* ============================================================
@@ -599,14 +602,25 @@ function escapeHtml(s) {
 function display(h) { return state.displayMode === 'hiragana' ? h : toRomaji(h); }
 
 // Cumulative pool: include selected JLPT level and all easier ones.
-// KANJI_DATA comes from kanji-data.js.
+// WORDS_DATA comes from words-data.js. Each entry: { w, h, e, j }.
 function activePool() {
-  return KANJI_DATA.filter(e => e.j >= state.jlptLevel);
+  return WORDS_DATA.filter(e => e.j >= state.jlptLevel);
 }
 
-function pickDistractors(correctH) {
-  const others = activePool().filter(e => e.h !== correctH);
-  if (others.length < 2) return ['?', '??'];
+// Returns 2 word entries whose readings are similar to correctEntry.h.
+// Excludes entries with the same reading or meaning so the right card is
+// unambiguous.
+function pickDistractors(correctEntry) {
+  const others = activePool().filter(e =>
+    e.h !== correctEntry.h && e.e !== correctEntry.e
+  );
+  if (others.length < 2) {
+    return [
+      { w: '?', h: '?', e: '?' },
+      { w: '??', h: '??', e: '??' }
+    ];
+  }
+  const correctH = correctEntry.h;
   const scored = others.map(e => {
     let s = 0;
     if (e.h.length === correctH.length) s += 2;
@@ -614,19 +628,26 @@ function pickDistractors(correctH) {
     let shared = 0;
     for (const c of e.h) if (correctH.includes(c)) shared++;
     s += shared;
-    return { h: e.h, s };
+    return { entry: e, s };
   });
   scored.sort((a, b) => b.s - a.s);
   const top = scored.slice(0, Math.min(40, scored.length));
   const sh = shuffle(top);
   const result = [];
+  const usedReadings = new Set([correctH]);
   for (const c of sh) {
     if (result.length === 2) break;
-    if (!result.includes(c.h) && c.h !== correctH) result.push(c.h);
+    if (!usedReadings.has(c.entry.h)) {
+      result.push(c.entry);
+      usedReadings.add(c.entry.h);
+    }
   }
   while (result.length < 2) {
-    const r = pickRandom(others).h;
-    if (r !== correctH && !result.includes(r)) result.push(r);
+    const e = pickRandom(others);
+    if (!usedReadings.has(e.h)) {
+      result.push(e);
+      usedReadings.add(e.h);
+    }
   }
   return result;
 }
@@ -807,21 +828,29 @@ function nextQuestion() {
     return;
   }
   state.currentEntry = pickRandom(pool);
-  const dist = pickDistractors(state.currentEntry.h);
-  const all = shuffle([state.currentEntry.h, dist[0], dist[1]]);
+  const dist = pickDistractors(state.currentEntry);
+  const all = shuffle([state.currentEntry, dist[0], dist[1]]);
   state.options = all;
-  state.correctIdx = all.indexOf(state.currentEntry.h);
+  state.correctIdx = all.indexOf(state.currentEntry);
   state.optionsLocked = false;
 
-  // Render kanji
+  // Render the word on the study card; scale font for longer words
+  const word = state.currentEntry.w;
   const charEl = document.getElementById('kanji-char');
-  charEl.textContent = state.currentEntry.k;
-  charEl.style.fontSize = state.currentEntry.k.length === 1 ? '130px' : '100px';
+  charEl.textContent = word;
+  if (word.length === 1) charEl.style.fontSize = '130px';
+  else if (word.length === 2) charEl.style.fontSize = '92px';
+  else if (word.length === 3) charEl.style.fontSize = '68px';
+  else if (word.length === 4) charEl.style.fontSize = '54px';
+  else charEl.style.fontSize = '44px';
 
-  // Render options
+  // Render options with two lines (reading + English meaning)
   const btns = document.querySelectorAll('.option-card');
   btns.forEach((b, i) => {
-    b.textContent = display(state.options[i]);
+    const opt = state.options[i];
+    b.innerHTML =
+      '<div class="reading">' + escapeHtml(display(opt.h)) + '</div>' +
+      '<div class="meaning">' + escapeHtml(opt.e) + '</div>';
     b.classList.remove('wrong', 'right');
     b.disabled = false;
     b.removeAttribute('data-mark');
